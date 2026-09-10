@@ -38,10 +38,20 @@ if [[ -z "$IDENTITY" ]] && security find-identity -p codesigning -v 2>/dev/null 
   IDENTITY="FloatTrans Dev"
 fi
 if [[ -n "$IDENTITY" ]]; then
-  codesign --force --options runtime --timestamp \
-    --sign "$IDENTITY" \
-    --entitlements "$ENTITLEMENTS" \
-    "$APP"
+  # --timestamp contacts Apple's timestamp server, which is unreachable from
+  # some networks and hangs the build. The local self-signed identity does
+  # not need a trusted timestamp: trust anchors on the certificate itself.
+  if [[ "$IDENTITY" == "FloatTrans Dev" ]]; then
+    codesign --force --options runtime \
+      --sign "$IDENTITY" \
+      --entitlements "$ENTITLEMENTS" \
+      "$APP"
+  else
+    codesign --force --options runtime --timestamp \
+      --sign "$IDENTITY" \
+      --entitlements "$ENTITLEMENTS" \
+      "$APP"
+  fi
   codesign --verify --deep --strict "$APP"
 else
   codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP"

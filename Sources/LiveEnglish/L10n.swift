@@ -33,7 +33,7 @@ enum L10n {
     // MARK: - Settings chrome
 
     static func settingsWindowTitle(_ lang: UILanguage) -> String {
-        lang == .chinese ? "浮译设置" : "FloatTrans Settings"
+        lang == .chinese ? "闪译设置" : "FloatTrans Settings"
     }
     static func tabGeneral(_ lang: UILanguage) -> String {
         lang == .chinese ? "通用" : "General"
@@ -194,7 +194,7 @@ enum L10n {
     static func historyExportMarkdown(_ lang: UILanguage) -> String { lang == .chinese ? "导出 Markdown" : "Export Markdown" }
     static func historyExportExcel(_ lang: UILanguage) -> String { lang == .chinese ? "导出 Excel" : "Export Excel" }
     static func historyExportTitle(_ lang: UILanguage) -> String {
-        lang == .chinese ? "浮译历史记录" : "FloatTrans Translation History"
+        lang == .chinese ? "闪译历史记录" : "FloatTrans Translation History"
     }
     static func historyEmpty(_ lang: UILanguage) -> String {
         lang == .chinese ? "暂时没有已完成的翻译记录。" : "No completed translations yet."
@@ -381,7 +381,7 @@ enum L10n {
 
     static func privacyExplanation(_ lang: UILanguage) -> String {
         lang == .chinese
-            ? "浮译不会读取或翻译以下应用内的文本。"
+            ? "闪译不会读取或翻译以下应用内的文本。"
             : "FloatTrans will not read or translate text inside these apps."
     }
     static func addApplication(_ lang: UILanguage) -> String {
@@ -477,7 +477,7 @@ enum L10n {
     // MARK: - About
 
     static func productName(_ lang: UILanguage) -> String {
-        "浮译"
+        "闪译"
     }
     static func version(
         _ lang: UILanguage,
@@ -500,8 +500,8 @@ enum L10n {
     }
     static func aboutBody(_ lang: UILanguage) -> String {
         lang == .chinese
-            ? "一款安静、实时的中译英菜单栏工具。\n读取当前文本框内容，并在不打扰工作的情况下显示翻译结果。\n翻译在本机完成。\n\nMIT 开源许可证"
-            : "A quiet, real-time Chinese-to-English menu bar tool.\nIt reads the current text field and shows translations without interrupting your work.\nTranslation runs on-device.\n\nMIT License"
+            ? "一款安静、实时的多语言翻译工具。\n输入框实时翻译 + 剪贴板翻译，低打扰浮窗显示。\n默认本地翻译，内容不出设备。\n\nMIT 开源许可证"
+            : "A quiet, real-time translation tool.\nLive input translation plus clipboard mode in a low-profile overlay.\nLocal by default; your text stays on device.\n\nMIT License"
     }
     static func aboutThanks(_ lang: UILanguage) -> String {
         lang == .chinese

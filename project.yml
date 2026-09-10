@@ -31,8 +31,8 @@ targets:
         CODE_SIGN_ENTITLEMENTS: Resources/LiveEnglish.entitlements
         PRODUCT_MODULE_NAME: LiveEnglish
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        INFOPLIST_KEY_CFBundleDisplayName: 浮译
-        INFOPLIST_KEY_CFBundleName: 浮译
+        INFOPLIST_KEY_CFBundleDisplayName: 闪译
+        INFOPLIST_KEY_CFBundleName: 闪译
         SWIFT_EMIT_LOC_STRINGS: NO
         CODE_SIGN_STYLE: Automatic
       configs:
