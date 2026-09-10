@@ -1,7 +1,7 @@
-// Generates the app icon set for the 「闪译」 brand.
+// Generates the app icon set for the 「Pico」 brand.
 // Run: swift Scripts/make-icon.swift
-// Draws a macOS-style squircle with an indigo-to-sky gradient, a white
-// speech bubble containing 译, and a yellow lightning badge (闪).
+// Pico is a tiny assistant: a speech-bubble face with big eyes, a smile and
+// an antenna, drawn on a macOS-style gradient squircle.
 
 import AppKit
 
@@ -40,15 +40,35 @@ func drawMaster() -> NSImage {
     edge.lineWidth = 6
     edge.stroke()
 
-    // Main speech bubble: rounded rectangle with a tail at the bottom-left.
-    let bubbleRect = NSRect(x: 212, y: 366, width: 600, height: 440)
-    let bubble = NSBezierPath(roundedRect: bubbleRect, xRadius: 88, yRadius: 88)
+    // Antenna: stem + glowing yellow orb, drawn behind the head.
+    let antenna = NSBezierPath()
+    antenna.move(to: NSPoint(x: 512, y: 774))
+    antenna.line(to: NSPoint(x: 512, y: 846))
+    color(0x3730A3).setStroke()
+    antenna.lineWidth = 22
+    antenna.lineCapStyle = .round
+    antenna.stroke()
+    let orbRect = NSRect(x: 512 - 46, y: 838, width: 92, height: 92)
+    let orbShadow = NSShadow()
+    orbShadow.shadowColor = color(0xFBBF24, 0.55)
+    orbShadow.shadowBlurRadius = 30
+    orbShadow.shadowOffset = .zero
+    context.saveGState()
+    orbShadow.set()
+    NSBezierPath(ovalIn: orbRect).addClip()
+    let orbGradient = NSGradient(colors: [color(0xFDE68A), color(0xF59E0B)])!
+    orbGradient.draw(in: orbRect, angle: -70)
+    context.restoreGState()
+
+    // Head: white speech-bubble face with a tail at the bottom-left.
+    let headRect = NSRect(x: 224, y: 300, width: 576, height: 470)
+    let head = NSBezierPath(roundedRect: headRect, xRadius: 116, yRadius: 116)
     let tail = NSBezierPath()
-    tail.move(to: NSPoint(x: bubbleRect.minX + 90, y: bubbleRect.minY + 30))
-    tail.line(to: NSPoint(x: bubbleRect.minX + 150, y: bubbleRect.minY - 118))
-    tail.line(to: NSPoint(x: bubbleRect.minX + 296, y: bubbleRect.minY - 6))
+    tail.move(to: NSPoint(x: headRect.minX + 110, y: headRect.minY + 20))
+    tail.line(to: NSPoint(x: headRect.minX + 170, y: headRect.minY - 118))
+    tail.line(to: NSPoint(x: headRect.minX + 300, y: headRect.minY - 10))
     tail.close()
-    bubble.append(tail)
+    head.append(tail)
 
     let shadow = NSShadow()
     shadow.shadowColor = color(0x0B1030, 0.35)
@@ -57,46 +77,35 @@ func drawMaster() -> NSImage {
     context.saveGState()
     shadow.set()
     color(0xFFFFFF).setFill()
-    bubble.fill()
+    head.fill()
     context.restoreGState()
 
-    // 译 glyph centered in the bubble, deep indigo.
-    let glyph = NSMutableAttributedString(
-        string: "译",
-        attributes: [
-            .font: NSFont(name: "PingFangSC-Semibold", size: 320) ?? NSFont.boldSystemFont(ofSize: 320),
-            .foregroundColor: color(0x3730A3),
-        ])
-    let glyphSize = glyph.size()
-    glyph.draw(
-        at: NSPoint(
-            x: bubbleRect.midX - glyphSize.width / 2,
-            y: bubbleRect.midY - glyphSize.height / 2 - 30))
+    // Eyes: two rounded vertical pills in the upper half of the face.
+    let eyeColor = color(0x3730A3)
+    for eyeCenterX in [382.0, 642.0] {
+        let eye = NSBezierPath(
+            roundedRect: NSRect(x: eyeCenterX - 28, y: 548, width: 56, height: 148),
+            xRadius: 28, yRadius: 28)
+        eyeColor.setFill()
+        eye.fill()
+    }
 
-    // Lightning badge (闪) at the bubble's top-right.
-    let badgeRect = NSRect(x: 672, y: 608, width: 178, height: 178)
-    let badge = NSBezierPath(roundedRect: badgeRect, xRadius: 48, yRadius: 48)
-    let badgeShadow = NSShadow()
-    badgeShadow.shadowColor = color(0x0B1030, 0.30)
-    badgeShadow.shadowBlurRadius = 16
-    badgeShadow.shadowOffset = NSSize(width: 0, height: -8)
-    context.saveGState()
-    badgeShadow.set()
-    let badgeGradient = NSGradient(colors: [color(0xFBBF24), color(0xF59E0B)])!
-    badgeGradient.draw(in: badgeRect, angle: -70)
-    context.restoreGState()
+    // Smile: a gentle arc below the eyes.
+    let smile = NSBezierPath()
+    smile.move(to: NSPoint(x: 444, y: 512))
+    smile.curve(
+        to: NSPoint(x: 580, y: 512),
+        controlPoint1: NSPoint(x: 474, y: 452),
+        controlPoint2: NSPoint(x: 550, y: 452))
+    eyeColor.setStroke()
+    smile.lineWidth = 24
+    smile.lineCapStyle = .round
+    smile.stroke()
 
-    // Bolt path inside the badge.
-    let bolt = NSBezierPath()
-    bolt.move(to: NSPoint(x: badgeRect.midX + 24, y: badgeRect.maxY - 32))
-    bolt.line(to: NSPoint(x: badgeRect.minX + 50, y: badgeRect.midY + 12))
-    bolt.line(to: NSPoint(x: badgeRect.midX - 8, y: badgeRect.midY + 8))
-    bolt.line(to: NSPoint(x: badgeRect.minX + 20, y: badgeRect.minY + 30))
-    bolt.line(to: NSPoint(x: badgeRect.maxX - 48, y: badgeRect.midY - 8))
-    bolt.line(to: NSPoint(x: badgeRect.midX + 6, y: badgeRect.midY - 4))
-    bolt.close()
-    color(0xFFFFFF).setFill()
-    bolt.fill()
+    // Blush: soft pink circles on the cheeks.
+    color(0xFDA4AF, 0.65).setFill()
+    NSBezierPath(ovalIn: NSRect(x: 288, y: 496, width: 66, height: 44)).fill()
+    NSBezierPath(ovalIn: NSRect(x: 670, y: 496, width: 66, height: 44)).fill()
 
     image.unlockFocus()
     return image

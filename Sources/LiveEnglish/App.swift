@@ -7,7 +7,7 @@ import SwiftUI
 @main struct LiveEnglishApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     var body: some Scene {
-        MenuBarExtra("FloatTrans", image: "MenuBarIcon") {
+        MenuBarExtra("Pico", image: "MenuBarIcon") {
             MenuBarMenu(state: appDelegate.state)
         }.menuBarExtraStyle(.menu)
         Settings { SettingsView(state: appDelegate.state) }

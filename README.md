@@ -1,4 +1,4 @@
-# 闪译 FloatTrans（二创版）
+# Pico 皮可 · 随身实时翻译小助手（二创版）
 
 > 基于 [krisir/floattrans](https://github.com/krisir/floattrans)（MIT 许可）增强的二创版本。
 > **[下载最新版](https://github.com/asiyoua/floattrans/releases)** · 原项目主页：[krisir.github.io/floattrans](https://krisir.github.io/floattrans/)
@@ -41,10 +41,11 @@
 - API 密钥仅存本机钥匙串，**禁止 iCloud 同步**，不写入偏好设置
 - 密码输入框（安全文本框）永不读取
 
-### 全新品牌
+### 全新品牌：拟人小助手 Pico
 
-- 全新图标：靛蓝渐变对话气泡 + 「译」 + 闪电徽标（由 `Scripts/make-icon.swift` 纯代码绘制）
-- 中文名更新为「**闪译**」——闪一般快的翻译；应用标识与数据位置不变，老用户无缝升级
+- 应用更名为 **Pico**（中文昵称「皮可」）——取自物理词头 pico-（10⁻¹²）：**又小又快**，正是这只 133 毫秒出译文的小跟班
+- 全新吉祥物图标：气泡小脸 + 天线 + 腮红（由 `Scripts/make-icon.swift` 纯代码绘制）
+- 应用标识与数据位置不变，老用户无缝升级
 
 ### 稳定性修复
 
@@ -79,9 +80,9 @@
 
 ## 安装（普通用户）
 
-1. 从 [Releases](https://github.com/asiyoua/floattrans/releases) 下载 DMG，把闪译拖入「应用程序」
+1. 从 [Releases](https://github.com/asiyoua/floattrans/releases) 下载 DMG，把Pico拖入「应用程序」
 2. 首次打开：右键点击 → 「打开」（本地签名未公证，Gatekeeper 会询问一次）
-3. 「系统设置 → 隐私与安全性 → 辅助功能」中开启闪译
+3. 「系统设置 → 隐私与安全性 → 辅助功能」中开启Pico
 4. 在设置 → 翻译中选择语言方向；微信里翻译用「复制 + ⌥⇧V」
 
 ## 构建和运行
@@ -92,7 +93,7 @@ zsh Scripts/build-app.sh
 open FloatTrans.app
 ```
 
-磁盘上的应用包和可执行文件名为 `FloatTrans`；用户看到的显示名是「闪译」。
+磁盘上的应用包和可执行文件名为 `FloatTrans`；用户看到的显示名是「Pico」。
 
 ## 打 DMG
 
@@ -110,7 +111,7 @@ zsh Scripts/build-dmg.sh
 
 ## 首次使用
 
-1. 启动闪译，按引导开启辅助功能权限
+1. 启动Pico，按引导开启辅助功能权限
 2. 在设置 → 翻译中选择本地翻译与源语言、目标语言；缺语言包时点击下载并等待完成
 3. 在支持无障碍的文本框（浏览器、TextEdit、办公软件等）输入所选源语言，停止输入片刻即出译文
 4. 微信等不暴露无障碍的应用：复制文字后按 ⌥⇧V，或在设置 → 翻译 → 剪贴板翻译中开启「自动监听」

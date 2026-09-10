@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleDisplayName</key>
-	<string>闪译</string>
+	<string>Pico</string>
 	<key>CFBundleExecutable</key>
 	<string>FloatTrans</string>
 	<key>CFBundleIconFile</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleIdentifier</key>
 	<string>cc.kristar.floattrans</string>
 	<key>CFBundleName</key>
-	<string>闪译</string>
+	<string>Pico</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
