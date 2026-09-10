@@ -65,6 +65,22 @@ final class TranslationHistoryTests: XCTestCase {
         XCTAssertTrue(entries.isEmpty)
     }
 
+    func testDeleteAllRemovesEveryRow() async throws {
+        let (store, cleanup) = try makeStore()
+        defer { cleanup() }
+        _ = try await store.recordAndLoad(
+            sourceText: "one", translatedText: "一", sourceLanguage: .english, targetLanguage: .chinese,
+            retention: .forever)
+        _ = try await store.recordAndLoad(
+            sourceText: "two", translatedText: "二", sourceLanguage: .english, targetLanguage: .chinese,
+            retention: .forever)
+
+        try await store.deleteAll()
+
+        let entries = try await store.load(retention: .forever)
+        XCTAssertTrue(entries.isEmpty)
+    }
+
     func testMarkdownExportGroupsByDateAndEscapesCells() {
         let entries = [
             TranslationHistoryEntry(

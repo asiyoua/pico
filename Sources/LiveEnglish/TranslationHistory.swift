@@ -139,22 +139,12 @@ actor TranslationHistoryStore {
         var entries: [TranslationHistoryEntry] = []
         var result = sqlite3_step(statement)
         while result == SQLITE_ROW {
-            guard
-                let sourceRaw = sqliteString(statement, column: 2),
-                let targetRaw = sqliteString(statement, column: 3),
-                let sourceLanguage = Language(rawValue: sourceRaw),
-                let targetLanguage = Language(rawValue: targetRaw),
-                let sourceText = sqliteString(statement, column: 4),
-                let translatedText = sqliteString(statement, column: 5)
-            else { throw TranslationHistoryStoreError.invalidLanguage }
-            entries.append(
-                TranslationHistoryEntry(
-                    id: sqlite3_column_int64(statement, 0),
-                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
-                    sourceLanguage: sourceLanguage,
-                    targetLanguage: targetLanguage,
-                    sourceText: sourceText,
-                    translatedText: translatedText))
+            // Rows written by an older build may carry a language code this
+            // version does not know. Skip those instead of failing the whole
+            // history, which would hide every readable record behind an error.
+            if let entry = self.entry(from: statement) {
+                entries.append(entry)
+            }
             result = sqlite3_step(statement)
         }
         if result != SQLITE_DONE {
@@ -163,12 +153,39 @@ actor TranslationHistoryStore {
         return entries
     }
 
+    private func entry(from statement: OpaquePointer) -> TranslationHistoryEntry? {
+        guard
+            let sourceRaw = sqliteString(statement, column: 2),
+            let targetRaw = sqliteString(statement, column: 3),
+            let sourceLanguage = Language(rawValue: sourceRaw),
+            let targetLanguage = Language(rawValue: targetRaw),
+            let sourceText = sqliteString(statement, column: 4),
+            let translatedText = sqliteString(statement, column: 5)
+        else { return nil }
+        return TranslationHistoryEntry(
+            id: sqlite3_column_int64(statement, 0),
+            createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
+            sourceLanguage: sourceLanguage,
+            targetLanguage: targetLanguage,
+            sourceText: sourceText,
+            translatedText: translatedText)
+    }
+
     func prune(retention: HistoryRetention, now: Date = .now) throws {
         guard let cutoff = retention.cutoffDate(now: now) else { return }
         let statement = try prepare("DELETE FROM translation_history WHERE created_at < ?;")
         defer { sqlite3_finalize(statement) }
         sqlite3_bind_double(statement, 1, cutoff.timeIntervalSince1970)
         try stepDone(statement)
+    }
+
+    /// Removes every row and vacuums so deleted text leaves no residue in
+    /// free pages of the database file.
+    func deleteAll() throws {
+        let statement = try prepare("DELETE FROM translation_history;")
+        defer { sqlite3_finalize(statement) }
+        try stepDone(statement)
+        try Self.execute("VACUUM;", database: database)
     }
 
     private static func execute(_ sql: String, database: OpaquePointer) throws {
@@ -250,6 +267,20 @@ final class TranslationHistoryController: ObservableObject {
                     sourceLanguage: sourceLanguage,
                     targetLanguage: targetLanguage,
                     retention: retention)
+                errorMessage = nil
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    /// Deletes every history row immediately, on explicit user request.
+    func clearAll() {
+        guard let store else { return }
+        Task {
+            do {
+                try await store.deleteAll()
+                entries = []
                 errorMessage = nil
             } catch {
                 errorMessage = error.localizedDescription
