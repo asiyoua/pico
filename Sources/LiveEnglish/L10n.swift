@@ -391,6 +391,89 @@ enum L10n {
         lang == .chinese ? "未知应用" : "Unknown App"
     }
 
+    // MARK: - Overlay appearance
+
+    static func overlayOpacity(_ lang: UILanguage) -> String {
+        lang == .chinese ? "悬浮窗透明度" : "Overlay Opacity"
+    }
+    static func overlayTheme(_ lang: UILanguage) -> String {
+        lang == .chinese ? "主题色" : "Accent Color"
+    }
+    static func overlaySurface(_ lang: UILanguage) -> String {
+        lang == .chinese ? "背景效果" : "Background"
+    }
+    static func themeSystem(_ lang: UILanguage) -> String {
+        lang == .chinese ? "跟随系统" : "System"
+    }
+    static func themeBlue(_ lang: UILanguage) -> String {
+        lang == .chinese ? "蓝色" : "Blue"
+    }
+    static func themeGreen(_ lang: UILanguage) -> String {
+        lang == .chinese ? "绿色" : "Green"
+    }
+    static func themePurple(_ lang: UILanguage) -> String {
+        lang == .chinese ? "紫色" : "Purple"
+    }
+    static func themeOrange(_ lang: UILanguage) -> String {
+        lang == .chinese ? "橙色" : "Orange"
+    }
+    static func themePink(_ lang: UILanguage) -> String {
+        lang == .chinese ? "粉色" : "Pink"
+    }
+    static func surfaceFrost(_ lang: UILanguage) -> String {
+        lang == .chinese ? "毛玻璃" : "Frosted"
+    }
+    static func surfaceGlass(_ lang: UILanguage) -> String {
+        lang == .chinese ? "轻透玻璃" : "Thin Glass"
+    }
+    static func surfaceThick(_ lang: UILanguage) -> String {
+        lang == .chinese ? "厚实" : "Thick"
+    }
+    static func surfaceSolid(_ lang: UILanguage) -> String {
+        lang == .chinese ? "纯色" : "Solid"
+    }
+
+    // MARK: - Clipboard translation
+
+    static func clipboardGroup(_ lang: UILanguage) -> String {
+        lang == .chinese ? "剪贴板翻译" : "Clipboard Translation"
+    }
+    static func clipboardTranslate(_ lang: UILanguage) -> String {
+        lang == .chinese ? "翻译复制的文字" : "Translate Copied Text"
+    }
+    static func clipboardTrigger(_ lang: UILanguage) -> String {
+        lang == .chinese ? "触发方式" : "Trigger"
+    }
+    static func triggerHotkey(_ lang: UILanguage) -> String {
+        lang == .chinese ? "快捷键" : "Hotkey"
+    }
+    static func triggerAuto(_ lang: UILanguage) -> String {
+        lang == .chinese ? "自动监听" : "Auto Watch"
+    }
+    static func clipboardShortcut(_ lang: UILanguage) -> String {
+        lang == .chinese ? "翻译快捷键" : "Hotkey"
+    }
+    static func clipboardHint(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "在任意应用按快捷键翻译剪贴板内容；自动监听模式下，复制包含源语言的内容即弹出译文。"
+            : "Press the hotkey in any app to translate the clipboard. In auto-watch mode, copying text in the source language shows the translation."
+    }
+
+    // MARK: - History safety
+
+    static func historyClear(_ lang: UILanguage) -> String {
+        lang == .chinese ? "清空历史" : "Clear History"
+    }
+    static func historyClearConfirm(_ lang: UILanguage) -> String {
+        lang == .chinese ? "确定要删除全部翻译历史吗？此操作不可恢复。" : "Delete all translation history? This cannot be undone."
+    }
+    static func historyClearAction(_ lang: UILanguage) -> String {
+        lang == .chinese ? "全部删除" : "Delete All"
+    }
+    static func cancelAction(_ lang: UILanguage) -> String {
+        lang == .chinese ? "取消" : "Cancel"
+    }
+
     // MARK: - About
 
     static func productName(_ lang: UILanguage) -> String {
@@ -420,10 +503,18 @@ enum L10n {
             ? "一款安静、实时的中译英菜单栏工具。\n读取当前文本框内容，并在不打扰工作的情况下显示翻译结果。\n翻译在本机完成。\n\nMIT 开源许可证"
             : "A quiet, real-time Chinese-to-English menu bar tool.\nIt reads the current text field and shows translations without interrupting your work.\nTranslation runs on-device.\n\nMIT License"
     }
-    static func aboutRepo(_ lang: UILanguage) -> String {
-        lang == .chinese ? "仓库：github.com/krisir/floattrans" : "Repo: github.com/krisir/floattrans"
+    static func aboutThanks(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "感谢原开发者 psychicsirk@gmail.com 的出色作品"
+            : "Thanks to the original developer psychicsirk@gmail.com"
     }
-    static func aboutDeveloper(_ lang: UILanguage) -> String {
-        lang == .chinese ? "开发者：psychicsirk@gmail.com" : "Developer: psychicsirk@gmail.com"
+    static func aboutOriginalRepo(_ lang: UILanguage) -> String {
+        lang == .chinese ? "原仓库" : "Original repo"
+    }
+    static func aboutForkRepo(_ lang: UILanguage) -> String {
+        lang == .chinese ? "二创版本" : "Fork"
+    }
+    static func aboutContactAuthor(_ lang: UILanguage) -> String {
+        lang == .chinese ? "联系作者" : "Contact the author"
     }
 }

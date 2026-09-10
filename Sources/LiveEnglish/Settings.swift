@@ -54,6 +54,53 @@ enum OverlayBehavior: String, CaseIterable {
     }
 }
 
+/// Accent color scheme for the translation overlay. Values persist in
+/// UserDefaults; color mapping lives in the overlay view.
+enum OverlayTheme: String, CaseIterable {
+    case system, blue, green, purple, orange, pink
+    func displayName(for lang: UILanguage) -> String {
+        switch self {
+        case .system: return L10n.themeSystem(lang)
+        case .blue: return L10n.themeBlue(lang)
+        case .green: return L10n.themeGreen(lang)
+        case .purple: return L10n.themePurple(lang)
+        case .orange: return L10n.themeOrange(lang)
+        case .pink: return L10n.themePink(lang)
+        }
+    }
+}
+
+/// Background visual effect for the translation overlay.
+enum OverlaySurfaceEffect: String, CaseIterable {
+    case frost
+    case glass
+    case thick
+    case solid
+    func displayName(for lang: UILanguage) -> String {
+        switch self {
+        case .frost: return L10n.surfaceFrost(lang)
+        case .glass: return L10n.surfaceGlass(lang)
+        case .thick: return L10n.surfaceThick(lang)
+        case .solid: return L10n.surfaceSolid(lang)
+        }
+    }
+}
+
+/// How a clipboard translation is triggered. Hotkey mode translates only
+/// when the user presses the shortcut; auto-watch translates every copied
+/// text that matches the source language.
+enum ClipboardTriggerMode: String, CaseIterable {
+    case hotkey
+    case autoWatch = "auto-watch"
+
+    func displayName(for lang: UILanguage) -> String {
+        switch self {
+        case .hotkey: return L10n.triggerHotkey(lang)
+        case .autoWatch: return L10n.triggerAuto(lang)
+        }
+    }
+}
+
 enum TranslationSpeed: Int, CaseIterable {
     case fast = 300
     case balanced = 450
@@ -155,6 +202,9 @@ struct ReplaceShortcut: Equatable, Sendable {
         keyCode: leftBracketKeyCode, carbonModifiers: optionKeyFlag | shiftKeyFlag)
     static let optionShiftRightBracket = ReplaceShortcut(
         keyCode: rightBracketKeyCode, carbonModifiers: optionKeyFlag | shiftKeyFlag)
+    static let vKeyCode: UInt32 = 0x09
+    static let optionShiftV = ReplaceShortcut(
+        keyCode: vKeyCode, carbonModifiers: optionKeyFlag | shiftKeyFlag)
 
     var displayString: String {
         var parts = ""
@@ -228,6 +278,24 @@ struct ReplaceShortcut: Equatable, Sendable {
     }
     @Published var overlayBehavior: OverlayBehavior {
         didSet { defaults.set(overlayBehavior.rawValue, forKey: "overlayBehavior") }
+    }
+    /// Whole-card transparency. 1.0 is fully opaque; values below let the
+    /// content behind the overlay show through.
+    @Published var overlayOpacity: Double {
+        didSet {
+            let clamped = min(max(overlayOpacity, 0.3), 1)
+            if overlayOpacity != clamped {
+                overlayOpacity = clamped
+                return
+            }
+            defaults.set(overlayOpacity, forKey: "overlayOpacity")
+        }
+    }
+    @Published var overlayTheme: OverlayTheme {
+        didSet { defaults.set(overlayTheme.rawValue, forKey: "overlayTheme") }
+    }
+    @Published var overlaySurface: OverlaySurfaceEffect {
+        didSet { defaults.set(overlaySurface.rawValue, forKey: "overlaySurface") }
     }
     @Published var uiLanguage: UILanguage { didSet { defaults.set(uiLanguage.rawValue, forKey: "uiLanguage") } }
     @Published var sourceLanguage: Language {
@@ -323,8 +391,29 @@ struct ReplaceShortcut: Equatable, Sendable {
     @Published var excludedBundleIDs: Set<String> {
         didSet { defaults.set(Array(excludedBundleIDs), forKey: "excludedBundleIDs") }
     }
+    @Published var clipboardTranslationEnabled: Bool {
+        didSet {
+            defaults.set(clipboardTranslationEnabled, forKey: "clipboardTranslationEnabled")
+            onClipboardSettingsChanged?()
+        }
+    }
+    @Published var clipboardTriggerMode: ClipboardTriggerMode {
+        didSet {
+            defaults.set(clipboardTriggerMode.rawValue, forKey: "clipboardTriggerMode")
+            onClipboardSettingsChanged?()
+        }
+    }
+    @Published var clipboardShortcut: ReplaceShortcut {
+        didSet {
+            persistShortcut(clipboardShortcut, keyCodeKey: "clipboardShortcutKeyCode", modifiersKey: "clipboardShortcutModifiers")
+            onClipboardSettingsChanged?()
+        }
+    }
     /// Assigned by AppState after its translation pipeline has been built.
     var onTranslationSettingsChanged: (() -> Void)?
+    /// Fires when any clipboard-translation setting changes so AppState can
+    /// re-sync the pasteboard watcher and hotkeys.
+    var onClipboardSettingsChanged: (() -> Void)?
     /// Reloads and immediately prunes local history after the user shortens
     /// the selected retention period.
     var onHistoryRetentionChanged: (() -> Void)?
@@ -349,6 +438,10 @@ struct ReplaceShortcut: Equatable, Sendable {
         } else {
             overlayBehavior = OverlayBehavior(rawValue: storedBehavior ?? OverlayBehavior.replace.rawValue) ?? .replace
         }
+        overlayOpacity =
+            min(max(defaults.object(forKey: "overlayOpacity") as? Double ?? 1, 0.3), 1)
+        overlayTheme = OverlayTheme(rawValue: defaults.string(forKey: "overlayTheme") ?? "") ?? .system
+        overlaySurface = OverlaySurfaceEffect(rawValue: defaults.string(forKey: "overlaySurface") ?? "") ?? .frost
         uiLanguage =
             UILanguage(rawValue: defaults.string(forKey: "uiLanguage") ?? UILanguage.chinese.rawValue) ?? .chinese
         let storedSource = Self.readLanguage(defaults.string(forKey: "sourceLanguage"), fallback: .chinese)
@@ -387,6 +480,12 @@ struct ReplaceShortcut: Equatable, Sendable {
         translateShortcut = Self.loadShortcut(
             defaults: defaults, keyCodeKey: "translateShortcutKeyCode", modifiersKey: "translateShortcutModifiers",
             fallback: .controlShiftT)
+        clipboardTranslationEnabled = defaults.object(forKey: "clipboardTranslationEnabled") as? Bool ?? false
+        clipboardTriggerMode =
+            ClipboardTriggerMode(rawValue: defaults.string(forKey: "clipboardTriggerMode") ?? "") ?? .hotkey
+        clipboardShortcut = Self.loadShortcut(
+            defaults: defaults, keyCodeKey: "clipboardShortcutKeyCode", modifiersKey: "clipboardShortcutModifiers",
+            fallback: .optionShiftV)
         excludedBundleIDs = Set(
             defaults.stringArray(forKey: "excludedBundleIDs") ?? [
                 "com.agilebits.onepassword7", "com.apple.keychainaccess", "com.apple.dt.Xcode", "com.openai.codex",

@@ -150,6 +150,7 @@ struct SettingsView: View {
     @State private var selectedPage: Page = .general
     @State private var draggedModelID: UUID?
     @State private var historyExportMessage: String?
+    @State private var showingClearHistoryConfirmation = false
 
     init(state: AppState) {
         self.state = state
@@ -421,6 +422,44 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .padding(.leading, 184)
+            SettingsGroupHeader(title: L10n.clipboardGroup(lang))
+            SettingsRow(label: L10n.clipboardTranslate(lang)) {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { settings.clipboardTranslationEnabled },
+                        set: { settings.clipboardTranslationEnabled = $0 })
+                )
+                .labelsHidden()
+                .toggleStyle(.switch)
+            }
+            if settings.clipboardTranslationEnabled {
+                SettingsRow(label: L10n.clipboardTrigger(lang)) {
+                    Picker(
+                        "",
+                        selection: $settings.clipboardTriggerMode
+                    ) {
+                        ForEach(ClipboardTriggerMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName(for: lang)).tag(mode)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.segmented)
+                    .frame(maxWidth: 200)
+                }
+                if settings.clipboardTriggerMode == .hotkey {
+                    SettingsRow(label: L10n.clipboardShortcut(lang)) {
+                        ShortcutRecorderButton(
+                            language: lang,
+                            shortcut: settings.clipboardShortcut,
+                            onCommit: { settings.clipboardShortcut = $0 })
+                    }
+                }
+                Text(L10n.clipboardHint(lang))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 184)
+            }
         }
     }
 
@@ -577,6 +616,54 @@ struct SettingsView: View {
                         .frame(width: 36, alignment: .trailing)
                 }
             }
+            SettingsRow(label: L10n.overlayOpacity(lang)) {
+                HStack(spacing: 8) {
+                    Slider(
+                        value: Binding(
+                            get: { settings.overlayOpacity },
+                            set: {
+                                settings.overlayOpacity = $0
+                                state.overlay.cardOpacity = $0
+                            }), in: 0.3...1, step: 0.05)
+                    Text("\(Int((settings.overlayOpacity * 100).rounded()))%")
+                        .monospacedDigit()
+                        .frame(width: 44, alignment: .trailing)
+                }
+            }
+            SettingsRow(label: L10n.overlayTheme(lang)) {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { settings.overlayTheme },
+                        set: {
+                            settings.overlayTheme = $0
+                            state.overlay.theme = $0
+                        })
+                ) {
+                    ForEach(OverlayTheme.allCases, id: \.self) { theme in
+                        Text(theme.displayName(for: lang)).tag(theme)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 160)
+            }
+            SettingsRow(label: L10n.overlaySurface(lang)) {
+                Picker(
+                    "",
+                    selection: Binding(
+                        get: { settings.overlaySurface },
+                        set: {
+                            settings.overlaySurface = $0
+                            state.overlay.surface = $0
+                        })
+                ) {
+                    ForEach(OverlaySurfaceEffect.allCases, id: \.self) { effect in
+                        Text(effect.displayName(for: lang)).tag(effect)
+                    }
+                }
+                .labelsHidden()
+                .frame(maxWidth: 160)
+            }
             SettingsGroupHeader(title: L10n.groupBehavior(lang))
             SettingsRow(label: L10n.newTranslationBehavior(lang)) {
                 Picker(
@@ -667,12 +754,28 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button(L10n.historyClear(lang), role: .destructive) {
+                    showingClearHistoryConfirmation = true
+                }
+                .controlSize(.small)
+                .disabled(history.entries.isEmpty)
                 Menu {
                     Button(L10n.historyExportMarkdown(lang)) { exportHistory(.markdown) }
                     Button(L10n.historyExportExcel(lang)) { exportHistory(.excel) }
                 } label: {
                     Label(L10n.historyExport(lang), systemImage: "square.and.arrow.up")
                 }
+            }
+            .confirmationDialog(
+                L10n.historyClearConfirm(lang),
+                isPresented: $showingClearHistoryConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(L10n.historyClearAction(lang), role: .destructive) {
+                    history.clearAll()
+                    historyExportMessage = nil
+                }
+                Button(L10n.cancelAction(lang), role: .cancel) {}
             }
 
             if let historyExportMessage {
