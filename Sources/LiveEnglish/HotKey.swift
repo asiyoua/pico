@@ -5,6 +5,7 @@ enum TranslationHotKeyAction: UInt32, CaseIterable {
     case replace = 1
     case copy = 2
     case translate = 3
+    case clipboard = 4
 }
 
 @MainActor

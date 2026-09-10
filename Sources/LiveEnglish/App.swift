@@ -43,6 +43,29 @@ struct MenuBarMenu: View {
     func applicationDidFinishLaunching(_ notification: Notification) {
         state.startTranslationHost()
     }
+    /// Clicking the Dock icon with no visible windows opens settings, so the
+    /// app is always configurable even when the menu bar item is hard to spot.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { state.presentSettings() }
+        return true
+    }
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let lang = state.settings.uiLanguage
+        let menu = NSMenu()
+        let settings = NSMenuItem(title: L10n.menuSettings(lang), action: #selector(openSettingsFromDock), keyEquivalent: "")
+        let toggle = NSMenuItem(
+            title: state.enabled ? L10n.pause(lang) : L10n.resume(lang),
+            action: #selector(toggleFromDock), keyEquivalent: "")
+        let quit = NSMenuItem(title: L10n.quit(lang), action: #selector(quitFromDock), keyEquivalent: "")
+        [settings, toggle, quit].forEach {
+            $0.target = self
+            menu.addItem($0)
+        }
+        return menu
+    }
+    @objc private func openSettingsFromDock() { state.presentSettings() }
+    @objc private func toggleFromDock() { state.toggle() }
+    @objc private func quitFromDock() { NSApp.terminate(nil) }
 }
 
 @MainActor final class AppState: ObservableObject {
@@ -62,6 +85,7 @@ struct MenuBarMenu: View {
     let history: TranslationHistoryController
     let overlay = OverlayCoordinator()
     let speech: SpeechPerforming
+    let pasteboardWatcher = PasteboardWatcher()
     private let speechPolicy = SpeechPolicyEvaluator()
     private let hotKey = GlobalHotKey.shared
     private var currentSession: InputSessionID?
@@ -108,6 +132,9 @@ struct MenuBarMenu: View {
         overlay.position = settings.overlayPosition
         overlay.edgeDistance = settings.overlayEdgeDistance
         overlay.behavior = settings.overlayBehavior
+        overlay.cardOpacity = settings.overlayOpacity
+        overlay.theme = settings.overlayTheme
+        overlay.surface = settings.overlaySurface
         monitor.onSnapshot = { [weak self] snapshot, session, screen in
             self?.input.handle(snapshot, session: session, screen: screen)
         }
@@ -116,6 +143,9 @@ struct MenuBarMenu: View {
         monitor.excludedBundleIDs = settings.excludedBundleIDs
         monitor.sourceLanguage = settings.sourceLanguage
         settings.onTranslationSettingsChanged = { [weak self] in self?.applyTranslationSettings() }
+        settings.onClipboardSettingsChanged = { [weak self] in self?.applyClipboardSettings() }
+        overlay.onCopyToPasteboard = { [weak self] _ in self?.pasteboardWatcher.resyncBaseline() }
+        pasteboardWatcher.onCopy = { [weak self] text in self?.translateCopiedText(text, autoTriggered: true) }
         settings.onHistoryRetentionChanged = { [weak self] in
             guard let self else { return }
             self.history.reload(retention: self.settings.historyRetention)
@@ -153,10 +183,12 @@ struct MenuBarMenu: View {
             case .replace: self?.handleReplaceHotKey()
             case .copy: self?.handleCopyHotKey()
             case .translate: self?.handleTranslateHotKey()
+            case .clipboard: self?.handleClipboardHotKey()
             }
         }
         refreshHotKeys()
         applyTranslationSettings()
+        applyClipboardSettings()
         history.reload(retention: settings.historyRetention)
         if showWelcome {
             Task { @MainActor [weak self] in
@@ -212,6 +244,7 @@ struct MenuBarMenu: View {
             speech.stop()
             overlay.hide()
         }
+        applyClipboardSettings()
     }
     func requestPermission() {
         permission.request()
@@ -304,7 +337,8 @@ struct MenuBarMenu: View {
                     targetLanguage: targetLanguage,
                     key: sentenceKey,
                     session: session,
-                    screen: screen)
+                    screen: screen,
+                    avoid: snapshot.fieldFrame)
             }
         }
     }
@@ -315,7 +349,9 @@ struct MenuBarMenu: View {
         targetLanguage: Language,
         key sentenceKey: String,
         session: InputSessionID,
-        screen: NSScreen?
+        screen: NSScreen?,
+        avoid: NSRect?,
+        speak: Bool = true
     ) {
         guard currentSession == session, enabled else {
             DiagnosticLog.write("translation discarded stale session")
@@ -337,8 +373,8 @@ struct MenuBarMenu: View {
             retention: settings.historyRetention)
         DiagnosticLog.write("translation result accepted length=\(result.count)")
         logger.info("translation result accepted length=\(result.count, privacy: .public)")
-        overlay.show(result, key: sentenceKey, on: screen)
-        speakIfAllowed(result)
+        overlay.show(result, key: sentenceKey, on: screen, avoid: avoid)
+        if speak { speakIfAllowed(result) }
         if pendingAction?.applyReplaceWhenReady == true { applyPendingReplace() }
         if pendingAction?.applyCopyWhenReady == true { applyPendingCopy() }
     }
@@ -391,6 +427,63 @@ struct MenuBarMenu: View {
         hotKey.set(
             .translate,
             shortcut: enabled && settings.translationTiming == .shortcut ? settings.translateShortcut : nil)
+        hotKey.set(
+            .clipboard,
+            shortcut: enabled && settings.clipboardTranslationEnabled ? settings.clipboardShortcut : nil)
+    }
+
+    /// Keeps the pasteboard watcher and the clipboard hotkey in sync with the
+    /// clipboard settings and the app's master switch.
+    func applyClipboardSettings() {
+        let active = enabled && settings.clipboardTranslationEnabled
+        if active && settings.clipboardTriggerMode == .autoWatch {
+            pasteboardWatcher.start()
+        } else {
+            pasteboardWatcher.stop()
+        }
+        refreshHotKeys()
+    }
+
+    private func handleClipboardHotKey() {
+        translateCopiedText(autoTriggered: false)
+    }
+
+    /// Translates the current clipboard content (hotkey) or the freshly
+    /// copied text (auto watch). Auto mode only fires for text in the
+    /// configured source language so code and links stay quiet.
+    func translateCopiedText(_ rawText: String? = nil, autoTriggered: Bool) {
+        guard enabled, settings.clipboardTranslationEnabled else { return }
+        guard var text = (rawText ?? NSPasteboard.general.string(forType: .string))?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty
+        else { return }
+        if text.count > 2000 { text = String(text.prefix(2000)) }
+        if autoTriggered {
+            guard LanguageTextDetector().contains(text, language: settings.sourceLanguage) else { return }
+        }
+        let session = InputSessionID(pid: ProcessInfo.processInfo.processIdentifier)
+        let sentenceKey = "clipboard:\(text)"
+        currentSession = session
+        pendingAction = PendingTranslationAction(
+            text: nil, sourceWithTerminator: nil, session: session, sentenceKey: sentenceKey)
+        DiagnosticLog.write("clipboard translation requested length=\(text.count)")
+        logger.info("clipboard translation requested length=\(text.count, privacy: .public)")
+        let coordinator = coordinator
+        Task { [weak self, coordinator] in
+            guard let result = await coordinator.translate(text) else { return }
+            await MainActor.run {
+                guard let self else { return }
+                self.acceptTranslationResult(
+                    result,
+                    sourceText: text,
+                    sourceLanguage: self.settings.sourceLanguage,
+                    targetLanguage: self.settings.targetLanguage,
+                    key: sentenceKey,
+                    session: session,
+                    screen: NSScreen.main,
+                    avoid: nil,
+                    speak: false)
+            }
+        }
     }
 
     private func handleTranslateHotKey() {
@@ -432,6 +525,7 @@ struct MenuBarMenu: View {
     private func applyPendingCopy() {
         guard enabled, settings.copyTranslation else { return }
         _ = TranslationClipboard.copy(pendingAction?.text)
+        pasteboardWatcher.resyncBaseline()
         pendingAction?.applyCopyWhenReady = false
     }
 
@@ -440,7 +534,11 @@ struct MenuBarMenu: View {
         translation = ""
     }
 
-    deinit { permissionPoll?.cancel() }
+    deinit {
+        permissionPoll?.cancel()
+        let watcher = pasteboardWatcher
+        Task { @MainActor in watcher.stop() }
+    }
 }
 
 private struct PendingTranslationAction {
@@ -473,11 +571,38 @@ struct AboutView: View {
             if let statusText {
                 Text(statusText).font(.caption).foregroundStyle(.secondary)
             }
-            Link(L10n.aboutRepo(language), destination: URL(string: "https://github.com/krisir/floattrans")!)
-            Link(L10n.aboutDeveloper(language), destination: URL(string: "mailto:psychicsirk@gmail.com")!)
+            Divider()
+            Text(L10n.aboutThanks(language))
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+            aboutLinkRow(
+                label: L10n.aboutOriginalRepo(language),
+                title: "github.com/krisir/floattrans",
+                urlString: "https://github.com/krisir/floattrans")
+            aboutLinkRow(
+                label: L10n.aboutForkRepo(language),
+                title: "github.com/asiyoua/floattrans",
+                urlString: "https://github.com/asiyoua/floattrans")
+            aboutLinkRow(
+                label: L10n.aboutContactAuthor(language),
+                title: "xinzhu400@gmail.com",
+                urlString: "mailto:xinzhu400@gmail.com")
         }
         .padding(28)
         .frame(maxWidth: 420)
+    }
+
+    private func aboutLinkRow(label: String, title: String, urlString: String) -> some View {
+        HStack(spacing: 10) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            if let url = URL(string: urlString) {
+                Link(title, destination: url).font(.caption)
+            }
+        }
     }
 
     private var statusText: String? {
@@ -527,10 +652,10 @@ struct WelcomeView: View {
             ).font(.title).multilineTextAlignment(.center)
             Text(
                 step == 0
-                    ? "Live English translates what you're typing without interrupting your workflow."
-                    : step == 1
-                        ? "Permission lets Live English read only the editable text field. Password fields are always skipped."
-                        : "Type something in Chinese in any supported text field."
+                        ? "Live English translates what you're typing without interrupting your workflow."
+                        : step == 1
+                            ? "Permission lets FloatTrans read only the editable text field. Password fields are always skipped."
+                            : "Type something in Chinese in any supported text field."
             ).multilineTextAlignment(.center).foregroundStyle(.secondary)
             if step == 1 && !state.permissionGranted {
                 Button("Allow Permission") { state.requestPermission() }.buttonStyle(.borderedProminent)

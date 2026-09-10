@@ -30,13 +30,20 @@ fi
 rm -f "$PARTIAL_PLIST"
 
 ENTITLEMENTS="$ROOT/Resources/LiveEnglish.entitlements"
-if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+# Prefer the stable self-signed identity ("FloatTrans Dev") so the macOS
+# accessibility grant survives reinstalls; fall back to ad-hoc. An explicit
+# CODESIGN_IDENTITY always wins.
+IDENTITY="${CODESIGN_IDENTITY:-}"
+if [[ -z "$IDENTITY" ]] && security find-identity -p codesigning -v 2>/dev/null | grep -q '"FloatTrans Dev"'; then
+  IDENTITY="FloatTrans Dev"
+fi
+if [[ -n "$IDENTITY" ]]; then
   codesign --force --options runtime --timestamp \
-    --sign "$CODESIGN_IDENTITY" \
+    --sign "$IDENTITY" \
     --entitlements "$ENTITLEMENTS" \
     "$APP"
   codesign --verify --deep --strict "$APP"
 else
   codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP"
 fi
-echo "Built $APP"
+echo "Built $APP (signed with ${IDENTITY:-adhoc})"
