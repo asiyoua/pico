@@ -65,12 +65,19 @@ public struct TextSnapshot: Sendable {
     public let bundleIdentifier: String?
     public let text: String
     public let selectedRange: NSRange?
+    /// Screen-space frame (Cocoa coordinates) of the focused text field, used
+    /// to keep the overlay from covering the text being typed.
+    public let fieldFrame: NSRect?
     public let timestamp: Date
-    public init(pid: pid_t, bundleIdentifier: String?, text: String, selectedRange: NSRange?, timestamp: Date = .now) {
+    public init(
+        pid: pid_t, bundleIdentifier: String?, text: String, selectedRange: NSRange?, fieldFrame: NSRect? = nil,
+        timestamp: Date = .now
+    ) {
         self.pid = pid
         self.bundleIdentifier = bundleIdentifier
         self.text = text
         self.selectedRange = selectedRange
+        self.fieldFrame = fieldFrame
         self.timestamp = timestamp
     }
 }
@@ -291,6 +298,7 @@ enum ShortcutSnapshotRecovery {
             bundleIdentifier: live.bundleIdentifier,
             text: lastGoodText,
             selectedRange: NSRange(location: (lastGoodText as NSString).length, length: 0),
+            fieldFrame: live.fieldFrame,
             timestamp: live.timestamp)
         guard detector.contains(extractor.extract(from: recovered), language: sourceLanguage) else { return live }
         return recovered
@@ -309,6 +317,10 @@ public actor TranslationCoordinator {
         let target: Language
     }
     private var cache: [CacheKey: String] = [:]
+    private var cacheOrder: [CacheKey] = []
+    /// Bounds memory during long sessions; FIFO eviction is enough because a
+    /// re-translated sentence simply re-inserts at the newest position.
+    private static let cacheLimit = 128
 
     public init(engine: any TranslationEngine, sourceLanguage: Language = .chinese, targetLanguage: Language = .english) {
         self.engine = engine
@@ -325,7 +337,10 @@ public actor TranslationCoordinator {
         task = nil
     }
 
-    public func clearCache() { cache.removeAll(keepingCapacity: true) }
+    public func clearCache() {
+        cache.removeAll(keepingCapacity: true)
+        cacheOrder.removeAll(keepingCapacity: true)
+    }
 
     public func translate(_ text: String) async -> String? {
         await translate(text, from: sourceLanguage, to: targetLanguage)
@@ -345,13 +360,24 @@ public actor TranslationCoordinator {
         do {
             let value = try await newTask.value
             guard current == generation, !Task.isCancelled else { return nil }
-            cache[cacheKey] = value
+            storeInCache(cacheKey, value)
             return value
         } catch {
             DiagnosticLog.write("translation error type=\(String(reflecting: error))")
             return nil
         }
     }
+
+    private func storeInCache(_ key: CacheKey, _ value: String) {
+        guard cache[key] == nil else { return }
+        cache[key] = value
+        cacheOrder.append(key)
+        if cacheOrder.count > Self.cacheLimit {
+            let evicted = cacheOrder.removeFirst()
+            cache.removeValue(forKey: evicted)
+        }
+    }
+
     public func cancel() {
         generation += 1
         task?.cancel()

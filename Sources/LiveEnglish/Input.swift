@@ -130,6 +130,10 @@ public struct InputSessionID: Hashable, Sendable {
     private var appObserver: NSObjectProtocol?, elementObserver: AXObserver?, pollTimer: Timer?, focused: AXUIElement?,
         lastText: String?, lastGoodText: String?, lastSelectedRange: NSRange?, session = InputSessionID(pid: 0)
     private var focusedApp: AXUIElement?
+    /// Screen frame of the focused text field, read once per focus change.
+    /// Reading it on every snapshot costs extra AX round-trips on every
+    /// keystroke, which is noticeable against slow accessibility apps.
+    private var focusedFieldFrame: NSRect?
     private(set) var isRunning = false
     func start() {
         guard AXIsProcessTrusted() else {
@@ -178,6 +182,7 @@ public struct InputSessionID: Hashable, Sendable {
     private func refreshFocusedElement(app: NSRunningApplication) {
         guard !excludedBundleIDs.contains(app.bundleIdentifier ?? "") else {
             focused = nil
+            focusedFieldFrame = nil
             lastGoodText = nil
             return
         }
@@ -188,8 +193,12 @@ public struct InputSessionID: Hashable, Sendable {
         if element == nil {
             let system = AXUIElementCreateSystemWide()
             var hit: AXUIElement?
-            let point = NSEvent.mouseLocation
-            let result = AXUIElementCopyElementAtPosition(system, Float(point.x), Float(point.y), &hit)
+            // AX position APIs take top-left-origin global coordinates, while
+            // NSEvent.mouseLocation is bottom-left-origin; convert before the
+            // hit test or the fallback probes the mirrored point.
+            let mouse = NSEvent.mouseLocation
+            let desktopTop = NSScreen.screens.map { $0.frame.maxY }.max() ?? mouse.y
+            let result = AXUIElementCopyElementAtPosition(system, Float(mouse.x), Float(desktopTop - mouse.y), &hit)
             if result == .success {
                 element = hit
                 DiagnosticLog.write("focused fallback elementAtPosition bundle=\(app.bundleIdentifier ?? "unknown")")
@@ -200,11 +209,12 @@ public struct InputSessionID: Hashable, Sendable {
         }
         guard let element else {
             focused = nil
+            focusedFieldFrame = nil
             lastGoodText = nil
             return
         }
         logElementDetails(element, prefix: "focused element bundle=\(app.bundleIdentifier ?? "unknown")")
-        let resolved = resolveTextElement(from: element, depth: 3)
+        let resolved = resolveTextElement(from: element, depth: 5)
         if let resolved {
             if let focused, !CFEqual(focused, resolved) {
                 lastGoodText = nil
@@ -212,10 +222,12 @@ public struct InputSessionID: Hashable, Sendable {
                 lastSelectedRange = nil
             }
             focused = resolved
+            focusedFieldFrame = readElementFrame(resolved)
             logElementDetails(resolved, prefix: "resolved text element")
             observeValue(on: resolved)
         } else {
             focused = nil
+            focusedFieldFrame = nil
             lastGoodText = nil
             DiagnosticLog.write("no supported text element found bundle=\(app.bundleIdentifier ?? "unknown")")
         }
@@ -263,6 +275,7 @@ public struct InputSessionID: Hashable, Sendable {
         elementObserver = nil
         focused = nil
         focusedApp = nil
+        focusedFieldFrame = nil
         lastText = nil
         lastGoodText = nil
         lastSelectedRange = nil
@@ -301,7 +314,8 @@ public struct InputSessionID: Hashable, Sendable {
         logger.info("AXValue read success length=\(text.count, privacy: .public)")
         let screen = NSScreen.main
         let snapshot = TextSnapshot(
-            pid: session.pid, bundleIdentifier: app.bundleIdentifier, text: text, selectedRange: selected)
+            pid: session.pid, bundleIdentifier: app.bundleIdentifier, text: text, selectedRange: selected,
+            fieldFrame: focusedFieldFrame)
         if !force {
             onSnapshot?(snapshot, session, screen)
         }
@@ -333,8 +347,26 @@ public struct InputSessionID: Hashable, Sendable {
         return nil
     }
 
-    private func stringForFullRange(_ element: AXUIElement) -> String? {
-        var countRef: CFTypeRef?
+    /// Screen-space frame (Cocoa coordinates) of the element. AX reports the
+    /// position in top-left-origin global coordinates, so the y axis is
+    /// converted against the desktop height before use by overlay placement.
+    private func readElementFrame(_ element: AXUIElement) -> NSRect? {
+        var positionRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
+        let positionStatus = AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionRef)
+        let sizeStatus = AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeRef)
+        guard positionStatus == .success, sizeStatus == .success, let positionRef, let sizeRef else { return nil }
+        var origin = CGPoint.zero
+        var size = CGSize.zero
+        let readOrigin = AXValueGetValue(positionRef as! AXValue, .cgPoint, &origin)
+        let readSize = AXValueGetValue(sizeRef as! AXValue, .cgSize, &size)
+        guard readOrigin, readSize else { return nil }
+        guard size.width > 0, size.height > 0 else { return nil }
+        let desktopTop = NSScreen.screens.map { $0.frame.maxY }.max() ?? 0
+        return NSRect(x: origin.x, y: desktopTop - origin.y - size.height, width: size.width, height: size.height)
+    }
+
+    private func stringForFullRange(_ element: AXUIElement) -> String? {        var countRef: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXNumberOfCharactersAttribute as CFString, &countRef) == .success
         else { return nil }
         let count: Int
@@ -426,6 +458,41 @@ enum TranslationClipboard {
 
 protocol PasteboardWriting {
     func writeString(_ text: String)
+}
+
+/// Watches the general pasteboard for user copies. Polling `changeCount` is
+/// a cheap integer comparison; the string is read only when it actually
+/// changed. Used by the clipboard translation trigger.
+@MainActor final class PasteboardWatcher {
+    var onCopy: ((String) -> Void)?
+    private var timer: Timer?
+    private var lastChangeCount = NSPasteboard.general.changeCount
+
+    func start(interval: TimeInterval = 0.25) {
+        guard timer == nil else { return }
+        resyncBaseline()
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.check() }
+        }
+    }
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+    /// Aligns the baseline with the current pasteboard so an app-initiated
+    /// copy (the overlay copy button) does not trigger a translation.
+    func resyncBaseline() {
+        lastChangeCount = NSPasteboard.general.changeCount
+    }
+    private func check() {
+        let pasteboard = NSPasteboard.general
+        guard pasteboard.changeCount != lastChangeCount else { return }
+        lastChangeCount = pasteboard.changeCount
+        guard let text = pasteboard.string(forType: .string)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty
+        else { return }
+        onCopy?(text)
+    }
 }
 
 struct SystemPasteboard: PasteboardWriting {
