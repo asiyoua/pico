@@ -66,7 +66,7 @@ Pico（皮可）是一只住在你菜单栏里的 macOS 实时翻译小助手：
 ```sh
 swift test
 zsh Scripts/build-app.sh
-open FloatTrans.app
+open Pico.app
 ```
 
 应用包、可执行文件与显示名统一为 Pico（Bundle ID 为 `com.asiyoua.pico`）。打包 DMG：
@@ -75,7 +75,7 @@ open FloatTrans.app
 zsh Scripts/build-dmg.sh
 ```
 
-对外公开分发建议配置 Developer ID 并公证（`CODESIGN_IDENTITY` / `NOTARY_PROFILE`）。本机构建优先使用名为 `FloatTrans Dev` 的自签名证书，同一证书签名的更新不会触发辅助功能重新授权。
+对外公开分发建议配置 Developer ID 并公证（`CODESIGN_IDENTITY` / `NOTARY_PROFILE`）。本机构建优先使用名为 `Pico Dev` 的自签名证书，同一证书签名的更新不会触发辅助功能重新授权。
 
 ## 图标生成
 
