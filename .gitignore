@@ -7,3 +7,6 @@ dist/
 .DS_Store
 xcuserdata/
 *.xcuserstate
+.cursor/
+.agents/
+.omp/
