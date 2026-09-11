@@ -129,4 +129,26 @@ final class TranslationHistoryTests: XCTestCase {
         let store = try TranslationHistoryStore(databaseURL: directory.appendingPathComponent("history.sqlite"))
         return (store, { try? FileManager.default.removeItem(at: directory) })
     }
+    func testDailyBackupCreatesSnapshotWithRows() async throws {
+        let (store, cleanup) = try makeStore()
+        defer { cleanup() }
+        _ = try await store.recordAndLoad(
+            sourceText: "备份验证", translatedText: "backup check", sourceLanguage: .chinese,
+            targetLanguage: .english, retention: .forever)
+
+        try await store.backupDaily()
+
+        let directory = store.databaseURL.deletingLastPathComponent()
+            .appendingPathComponent("backups", isDirectory: true)
+        let contents = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        XCTAssertTrue(contents.contains { $0.hasPrefix("history-") && $0.hasSuffix(".sqlite") })
+
+        // The snapshot must be a readable database containing the row.
+        let backupFile = directory.appendingPathComponent(contents.first { $0.hasPrefix("history-") }!, isDirectory: false).path
+        let restored = try TranslationHistoryStore(databaseURL: URL(fileURLWithPath: backupFile))
+        let rows = try await restored.load(retention: .forever)
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.sourceText, "备份验证")
+    }
+
 }

@@ -56,8 +56,10 @@ enum TranslationHistoryStoreError: LocalizedError {
 actor TranslationHistoryStore {
     private let connection: SQLiteDatabase
     private var database: OpaquePointer { connection.handle }
+    nonisolated let databaseURL: URL
 
     init(databaseURL: URL) throws {
+        self.databaseURL = databaseURL
         try FileManager.default.createDirectory(
             at: databaseURL.deletingLastPathComponent(), withIntermediateDirectories: true)
 
@@ -87,6 +89,7 @@ actor TranslationHistoryStore {
         try Self.execute(
             "CREATE INDEX IF NOT EXISTS translation_history_created_at ON translation_history(created_at DESC);",
             database: opened)
+        Task { try? await backupDaily() }
     }
 
     static func defaultDatabaseURL(fileManager: FileManager = .default) throws -> URL {
@@ -169,6 +172,33 @@ actor TranslationHistoryStore {
             targetLanguage: targetLanguage,
             sourceText: sourceText,
             translatedText: translatedText)
+    }
+
+    /// Once per launch, snapshots the whole database into a `backups/` folder
+    /// next to the live file (one file per day, newest 7 kept). VACUUM INTO
+    /// writes a consistent compact copy, so even if the live database is ever
+    /// deleted or corrupted externally, at most one day of history is at risk.
+    func backupDaily() throws {
+        let directory = databaseURL.deletingLastPathComponent()
+            .appendingPathComponent("backups", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let target = directory.appendingPathComponent("history-\(formatter.string(from: Date())).sqlite")
+        try? FileManager.default.removeItem(at: target)
+        let statement = try prepare("VACUUM INTO ?;")
+        sqlite3_bind_text(statement, 1, (target.path as NSString).utf8String, -1, sqliteTransient)
+        defer { sqlite3_finalize(statement) }
+        try stepDone(statement)
+        // Retain the newest seven daily snapshots.
+        var backups = ((try? FileManager.default.contentsOfDirectory(atPath: directory.path)) ?? [])
+            .filter { $0.hasPrefix("history-") && $0.hasSuffix(".sqlite") }
+            .sorted()
+        while backups.count > 7, let oldest = backups.first {
+            try? FileManager.default.removeItem(at: directory.appendingPathComponent(oldest))
+            backups.removeFirst()
+        }
     }
 
     func prune(retention: HistoryRetention, now: Date = .now) throws {
