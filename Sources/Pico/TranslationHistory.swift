@@ -96,7 +96,7 @@ actor TranslationHistoryStore {
             appropriateFor: nil,
             create: true)
         return support
-            .appendingPathComponent("FloatTrans", isDirectory: true)
+            .appendingPathComponent("Pico", isDirectory: true)
             .appendingPathComponent("translation-history.sqlite", isDirectory: false)
     }
 
