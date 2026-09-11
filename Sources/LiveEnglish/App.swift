@@ -583,7 +583,7 @@ struct AboutView: View {
             aboutLinkRow(
                 label: L10n.aboutForkRepo(language),
                 title: "github.com/asiyoua/floattrans",
-                urlString: "https://github.com/asiyoua/floattrans")
+                urlString: "https://github.com/asiyoua/pico")
             aboutLinkRow(
                 label: L10n.aboutContactAuthor(language),
                 title: "xinzhu400@gmail.com",

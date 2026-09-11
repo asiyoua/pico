@@ -3,906 +3,77 @@ import SwiftUI
 import UniformTypeIdentifiers
 @preconcurrency import Translation
 
-struct SettingsRow<Content: View>: View {
+// MARK: - Layout primitives
+
+/// A settings row: leading title (with optional subtitle) and a trailing
+/// control. Draws a hairline separator under itself unless suppressed for
+/// the last row of a group.
+struct SettingsRow<Control: View>: View {
     let label: String
-    @ViewBuilder var content: () -> Content
+    var subtitle: String? = nil
+    var divider: Bool = true
+    @ViewBuilder var control: () -> Control
 
     var body: some View {
-        HStack(alignment: .center, spacing: 16) {
-            Text(label)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 168, alignment: .trailing)
-            content()
-            Spacer(minLength: 0)
-        }
-    }
-}
-
-/// A light material panel keeps dense settings readable while preserving the
-/// native macOS appearance in both light and dark mode.
-struct SettingsPanel<Content: View>: View {
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14, content: content)
-            .padding(18)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-            }
-    }
-}
-
-struct SettingsGroupHeader: View {
-    let title: String
-    var body: some View {
-        Text(title)
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.secondary)
-            .padding(.top, 4)
-    }
-}
-
-/// Gives the full-width settings navigation cells a restrained pressed state
-/// without restoring macOS's prominent keyboard focus outline.
-private struct SettingsTabButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.vertical, 8)
-            .frame(maxWidth: .infinity)
-            .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .background {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(configuration.isPressed ? Color.accentColor.opacity(0.16) : Color.clear)
-            }
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-    }
-}
-
-struct OverlayPositionPicker: View {
-    @Binding var selection: OverlayPosition
-    let language: UILanguage
-
-    var body: some View {
-        HStack(spacing: 12) {
-            ForEach(OverlayPosition.allCases, id: \.self) { position in
-                Button {
-                    selection = position
-                } label: {
-                    VStack(spacing: 6) {
-                        OverlayPositionThumbnail(position: position, isSelected: selection == position)
-                        Text(position.displayName(for: language))
-                            .font(.caption)
-                            .foregroundStyle(selection == position ? .primary : .secondary)
-                    }
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
-
-struct OverlayPositionThumbnail: View {
-    let position: OverlayPosition
-    let isSelected: Bool
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .fill(Color.secondary.opacity(0.08))
-            RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.45), lineWidth: isSelected ? 2 : 1)
-            GeometryReader { geo in
-                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                    .fill(isSelected ? Color.accentColor : Color.primary.opacity(0.55))
-                    .frame(width: geo.size.width * 0.36, height: 5)
-                    .position(indicatorCenter(in: geo.size))
-            }
-            .padding(1)
-        }
-        .frame(width: 64, height: 40)
-    }
-
-    private func indicatorCenter(in size: CGSize) -> CGPoint {
-        let inset: CGFloat = 8
-        switch position {
-        case .topRight:
-            return CGPoint(x: size.width - inset - size.width * 0.18, y: inset + 2.5)
-        case .bottomCenter:
-            return CGPoint(x: size.width / 2, y: size.height - inset - 2.5)
-        case .bottomRight:
-            return CGPoint(x: size.width - inset - size.width * 0.18, y: size.height - inset - 2.5)
-        }
-    }
-}
-
-struct SettingsView: View {
-    private enum Page: CaseIterable {
-        case general, translation, overlay, history, privacy, about
-
-        var systemImage: String {
-            switch self {
-            case .general: return "gearshape"
-            case .translation: return "character.bubble"
-            case .overlay: return "rectangle.on.rectangle"
-            case .history: return "clock"
-            case .privacy: return "lock"
-            case .about: return "info.circle"
-            }
-        }
-
-        func title(_ lang: UILanguage) -> String {
-            switch self {
-            case .general: return L10n.tabGeneral(lang)
-            case .translation: return L10n.tabTranslation(lang)
-            case .overlay: return L10n.tabOverlay(lang)
-            case .history: return L10n.tabHistory(lang)
-            case .privacy: return L10n.tabPrivacy(lang)
-            case .about: return L10n.tabAbout(lang)
-            }
-        }
-    }
-
-    @ObservedObject var state: AppState
-    @ObservedObject private var settings: SettingsStore
-    @ObservedObject private var history: TranslationHistoryController
-    @State private var selectedPage: Page = .general
-    @State private var draggedModelID: UUID?
-    @State private var historyExportMessage: String?
-    @State private var showingClearHistoryConfirmation = false
-
-    init(state: AppState) {
-        self.state = state
-        self._settings = ObservedObject(wrappedValue: state.settings)
-        self._history = ObservedObject(wrappedValue: state.history)
-    }
-
-    private var lang: UILanguage { settings.uiLanguage }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            tabBar
-            Divider()
-            pageContent
-        }
-        .frame(minWidth: 760, idealWidth: 840, minHeight: 520, idealHeight: 700)
-        .onAppear { state.updateSettingsWindowTitle() }
-        .onChange(of: settings.uiLanguage) { _, _ in state.updateSettingsWindowTitle() }
-    }
-
-    private var tabBar: some View {
-        HStack(spacing: 6) {
-            ForEach(Page.allCases, id: \.self) { page in
-                tabButton(page)
-            }
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-    }
-
-    private func tabButton(_ page: Page) -> some View {
-        let selected = selectedPage == page
-        return Button {
-            selectedPage = page
-        } label: {
-            HStack(spacing: 6) {
-                if page == .history {
-                    Image("HistoryIcon")
-                        .renderingMode(.template)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 14, height: 14)
-                } else {
-                    Image(systemName: page.systemImage)
-                }
-                Text(page.title(lang))
-            }
-            .frame(maxWidth: .infinity)
-                .font(.system(size: 12, weight: selected ? .semibold : .regular))
-                .lineLimit(1)
-                .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-        }
-        .buttonStyle(SettingsTabButtonStyle())
-        .focusEffectDisabled()
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var pageContent: some View {
-        Group {
-            switch selectedPage {
-            case .general: generalPage
-            case .translation: translationPage
-            case .overlay: overlayPage
-            case .history: historyPage
-            case .privacy: privacyPage
-            case .about: aboutPage
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var generalPage: some View {
-        settingsPage(title: L10n.tabGeneral(lang)) {
-            SettingsRow(label: L10n.enableLiveTranslation(lang)) {
-                Toggle("", isOn: Binding(get: { state.enabled }, set: { _ in state.toggle() }))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-            SettingsRow(label: L10n.launchAtLogin(lang)) {
-                Toggle("", isOn: $state.settings.launchAtLogin)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-            }
-            SettingsRow(label: L10n.interfaceLanguage(lang)) {
-                Picker("", selection: $settings.uiLanguage) {
-                    ForEach(UILanguage.allCases) { language in
-                        Text(language.pickerLabel).tag(language)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 160)
-            }
-            SettingsRow(label: L10n.accessibility(lang)) {
-                if state.permissionGranted {
-                    Text(L10n.permissionGranted(lang))
-                        .font(.subheadline)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label)
+                if let subtitle {
+                    Text(subtitle)
+                        .font(.caption)
                         .foregroundStyle(.secondary)
-                } else {
-                    HStack(alignment: .center, spacing: 8) {
-                        Text(L10n.permissionHint(lang))
-                            .font(.subheadline)
-                            .foregroundStyle(.yellow)
-                        Button(L10n.openSystemSettings(lang)) { state.requestPermission() }
-                    }
                 }
+            }
+            Spacer(minLength: 12)
+            control()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .overlay(alignment: .bottom) {
+            if divider {
+                Divider().padding(.leading, 16)
             }
         }
-    }
-
-    private var translationPage: some View {
-        settingsPage(title: L10n.tabTranslation(lang)) {
-            SettingsRow(label: L10n.translationBackend(lang)) {
-                Picker("", selection: $settings.translationBackend) {
-                    ForEach(TranslationBackend.allCases) { backend in
-                        Text(backend.displayName(for: lang)).tag(backend)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 220)
-            }
-            SettingsRow(label: L10n.sourceLanguage(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { settings.sourceLanguage },
-                        set: { source in
-                            settings.sourceLanguage = source
-                            if settings.targetLanguage == source {
-                                settings.targetLanguage = source == .english ? .chinese : .english
-                            }
-                        })
-                ) {
-                    ForEach(Language.allCases) { language in
-                        Text(languageName(language)).tag(language)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 220)
-            }
-            SettingsRow(label: L10n.targetLanguage(lang)) {
-                Picker("", selection: $settings.targetLanguage) {
-                    ForEach(Language.allCases.filter { $0 != settings.sourceLanguage }) { language in
-                        Text(languageName(language)).tag(language)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 220)
-            }
-            SettingsRow(label: L10n.translationDirection(lang)) {
-                Text(L10n.translationDirectionValue(settings.sourceLanguage, settings.targetLanguage, lang))
-                    .foregroundStyle(.secondary)
-            }
-            SettingsRow(label: L10n.translationSpeed(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { state.settings.translationSpeed },
-                        set: {
-                            state.settings.translationSpeed = $0
-                            state.input.delayMilliseconds = $0
-                        })
-                ) {
-                    Text(L10n.speedFast(lang)).tag(300)
-                    Text(L10n.speedBalanced(lang)).tag(450)
-                    Text(L10n.speedRelaxed(lang)).tag(700)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(maxWidth: 260)
-            }
-            SettingsRow(label: L10n.translationTiming(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { settings.translationTiming },
-                        set: { state.setTranslationTiming($0) })
-                ) {
-                    ForEach(TranslationTiming.allCases, id: \.self) { mode in
-                        Text(mode.displayName(for: lang)).tag(mode)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 260)
-            }
-            if settings.translationTiming == .shortcut {
-                SettingsRow(label: L10n.translateShortcut(lang)) {
-                    ShortcutRecorderButton(
-                        language: lang,
-                        shortcut: settings.translateShortcut,
-                        onCommit: { state.setTranslateShortcut($0) })
-                }
-            }
-            if settings.translationBackend == .local {
-                SettingsRow(label: L10n.languageResources(lang)) {
-                    LanguageResourceRow(
-                        language: lang,
-                        sourceLanguage: settings.sourceLanguage,
-                        targetLanguage: settings.targetLanguage)
-                }
-                Text(L10n.localTranslationPrivacy(lang))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 184)
-            } else {
-                modelSettingsSection
-            }
-            SettingsGroupHeader(title: L10n.groupActions(lang))
-            SettingsRow(label: L10n.replaceOriginal(lang)) {
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { settings.replaceOriginal },
-                        set: { state.setReplaceOriginal($0) })
-                )
-                .labelsHidden()
-                .toggleStyle(.switch)
-            }
-            SettingsRow(label: L10n.replaceShortcut(lang)) {
-                ShortcutRecorderButton(
-                    language: lang,
-                    shortcut: settings.replaceShortcut,
-                    onCommit: { state.setReplaceShortcut($0) })
-            }
-            Text(L10n.replaceOriginalHint(lang))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 184)
-            SettingsRow(label: L10n.copyTranslation(lang)) {
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { settings.copyTranslation },
-                        set: { state.setCopyTranslation($0) })
-                )
-                .labelsHidden()
-                .toggleStyle(.switch)
-            }
-            SettingsRow(label: L10n.copyShortcut(lang)) {
-                ShortcutRecorderButton(
-                    language: lang,
-                    shortcut: settings.copyShortcut,
-                    onCommit: { state.setCopyShortcut($0) })
-            }
-            Text(L10n.copyTranslationHint(lang))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 184)
-            SettingsGroupHeader(title: L10n.groupSpeech(lang))
-            SettingsRow(label: L10n.readTranslationsAloud(lang)) {
-                Menu {
-                    Toggle(L10n.speechTimingAll(lang), isOn: allSpeechTriggersBinding)
-                    Divider()
-                    ForEach(SpeechTrigger.allCases) { trigger in
-                        Toggle(speechTriggerName(trigger), isOn: speechTriggerBinding(trigger))
-                    }
-                } label: {
-                    HStack(spacing: 8) {
-                        Text(L10n.speechTimingSummary(settings.speechTriggers, lang))
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(minWidth: 250, alignment: .leading)
-                }
-                .menuStyle(.borderedButton)
-            }
-            Text(L10n.speechVoiceHint(settings.targetLanguage, lang))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 184)
-            SettingsGroupHeader(title: L10n.clipboardGroup(lang))
-            SettingsRow(label: L10n.clipboardTranslate(lang)) {
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { settings.clipboardTranslationEnabled },
-                        set: { settings.clipboardTranslationEnabled = $0 })
-                )
-                .labelsHidden()
-                .toggleStyle(.switch)
-            }
-            if settings.clipboardTranslationEnabled {
-                SettingsRow(label: L10n.clipboardTrigger(lang)) {
-                    Picker(
-                        "",
-                        selection: $settings.clipboardTriggerMode
-                    ) {
-                        ForEach(ClipboardTriggerMode.allCases, id: \.self) { mode in
-                            Text(mode.displayName(for: lang)).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                    .frame(maxWidth: 200)
-                }
-                if settings.clipboardTriggerMode == .hotkey {
-                    SettingsRow(label: L10n.clipboardShortcut(lang)) {
-                        ShortcutRecorderButton(
-                            language: lang,
-                            shortcut: settings.clipboardShortcut,
-                            onCommit: { settings.clipboardShortcut = $0 })
-                    }
-                }
-                Text(L10n.clipboardHint(lang))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 184)
-            }
-        }
-    }
-
-    private var allSpeechTriggersBinding: Binding<Bool> {
-        Binding(
-            get: { settings.speechTriggers == .all },
-            set: { setSpeechTriggers($0 ? .all : []) })
-    }
-
-    private func speechTriggerBinding(_ trigger: SpeechTrigger) -> Binding<Bool> {
-        let selection = SpeechTriggerSelection(rawValue: trigger.rawValue)
-        return Binding(
-            get: { settings.speechTriggers.contains(selection) },
-            set: { enabled in
-                var updated = settings.speechTriggers
-                if enabled {
-                    updated.insert(selection)
-                } else {
-                    updated.remove(selection)
-                }
-                setSpeechTriggers(updated)
-            })
-    }
-
-    private func setSpeechTriggers(_ triggers: SpeechTriggerSelection) {
-        settings.speechTriggers = triggers
-        if triggers.isEmpty { state.speech.stop() }
-    }
-
-    private func speechTriggerName(_ trigger: SpeechTrigger) -> String {
-        switch trigger {
-        case .pause: return L10n.speechTimingPause(lang)
-        case .completeSentence: return L10n.speechTimingCompleteSentence(lang)
-        case .shortcut: return L10n.speechTimingShortcut(lang)
-        }
-    }
-
-    @ViewBuilder
-    private var modelSettingsSection: some View {
-        SettingsGroupHeader(title: L10n.modelSettings(lang))
-        Text(L10n.modelSettingsHint(lang))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 184)
-        SettingsRow(label: L10n.failoverTimeout(lang)) {
-            HStack(spacing: 8) {
-                Slider(value: $settings.llmFallbackTimeout, in: 1...120, step: 1)
-                Text(L10n.timeoutSeconds(lang, Int(settings.llmFallbackTimeout)))
-                    .monospacedDigit()
-                    .frame(width: 112, alignment: .trailing)
-            }
-            .frame(maxWidth: 290)
-        }
-        Text(L10n.apiKeyKeychainHint(lang))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 184)
-        if settings.llmModels.isEmpty {
-            Text(L10n.noModels(lang))
-                .foregroundStyle(.secondary)
-                .padding(.leading, 184)
-        } else {
-            // This is intentionally a VStack rather than a nested List: the
-            // page's outer ScrollView is the only scroll container. Rows are
-            // still draggable to reorder models within that single viewport.
-            VStack(alignment: .leading, spacing: 8) {
-                ForEach(settings.llmModels) { model in
-                    LLMModelEditor(
-                        model: model,
-                        language: lang,
-                        save: { settings.updateLLMModel($0) },
-                        remove: { settings.removeLLMModel(id: model.id) })
-                        .padding(10)
-                        .background(Color.primary.opacity(0.035), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-                        .onDrag {
-                            draggedModelID = model.id
-                            return NSItemProvider(object: model.id.uuidString as NSString)
-                        }
-                        .onDrop(
-                            of: [.text],
-                            delegate: ModelOrderDropDelegate(
-                                targetID: model.id,
-                                models: $settings.llmModels,
-                                draggedID: $draggedModelID))
-                }
-            }
-            .padding(.leading, 184)
-        }
-        SettingsRow(label: "") {
-            Button(L10n.addModel(lang)) { settings.addLLMModel(defaultModel()) }
-                .buttonStyle(.bordered)
-        }
-        Text(L10n.llmTranslationPrivacy(lang))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .padding(.leading, 184)
-    }
-
-    private func languageName(_ language: Language) -> String {
-        lang == .chinese ? language.chineseName : language.englishName
-    }
-
-    private func defaultModel() -> LLMModelConfiguration {
-        LLMModelConfiguration(
-            name: lang == .chinese ? "新的 API 模型" : "New API Model",
-            provider: .openAICompatible,
-            baseURL: LLMProvider.openAICompatible.defaultBaseURL,
-            model: LLMProvider.openAICompatible.defaultModel,
-            timeoutSeconds: 0)
-    }
-
-    private var overlayPage: some View {
-        settingsPage(title: L10n.tabOverlay(lang)) {
-            SettingsGroupHeader(title: L10n.groupPosition(lang))
-            SettingsRow(label: L10n.displayPosition(lang)) {
-                OverlayPositionPicker(
-                    selection: Binding(
-                        get: { settings.overlayPosition },
-                        set: {
-                            settings.overlayPosition = $0
-                            state.overlay.position = $0
-                        }
-                    ),
-                    language: lang
-                )
-            }
-            SettingsGroupHeader(title: L10n.groupAppearance(lang))
-            SettingsRow(label: L10n.textSize(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { settings.textSize },
-                        set: {
-                            settings.textSize = $0
-                            state.overlay.textSize = $0
-                        })
-                ) {
-                    ForEach(OverlayTextSize.allCases, id: \.self) { Text($0.displayName(for: lang)).tag($0) }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 160)
-            }
-            SettingsRow(label: L10n.edgeDistance(lang)) {
-                HStack(spacing: 8) {
-                    Slider(
-                        value: Binding(
-                            get: { settings.overlayEdgeDistance },
-                            set: {
-                                settings.overlayEdgeDistance = $0
-                                state.overlay.edgeDistance = $0
-                            }), in: 0...300, step: 4)
-                    Text("\(Int(settings.overlayEdgeDistance))")
-                        .monospacedDigit()
-                        .frame(width: 36, alignment: .trailing)
-                }
-            }
-            SettingsRow(label: L10n.overlayOpacity(lang)) {
-                HStack(spacing: 8) {
-                    Slider(
-                        value: Binding(
-                            get: { settings.overlayOpacity },
-                            set: {
-                                settings.overlayOpacity = $0
-                                state.overlay.cardOpacity = $0
-                            }), in: 0.3...1, step: 0.05)
-                    Text("\(Int((settings.overlayOpacity * 100).rounded()))%")
-                        .monospacedDigit()
-                        .frame(width: 44, alignment: .trailing)
-                }
-            }
-            SettingsRow(label: L10n.overlayTheme(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { settings.overlayTheme },
-                        set: {
-                            settings.overlayTheme = $0
-                            state.overlay.theme = $0
-                        })
-                ) {
-                    ForEach(OverlayTheme.allCases, id: \.self) { theme in
-                        Text(theme.displayName(for: lang)).tag(theme)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 160)
-            }
-            SettingsRow(label: L10n.overlaySurface(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { settings.overlaySurface },
-                        set: {
-                            settings.overlaySurface = $0
-                            state.overlay.surface = $0
-                        })
-                ) {
-                    ForEach(OverlaySurfaceEffect.allCases, id: \.self) { effect in
-                        Text(effect.displayName(for: lang)).tag(effect)
-                    }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 160)
-            }
-            SettingsGroupHeader(title: L10n.groupBehavior(lang))
-            SettingsRow(label: L10n.newTranslationBehavior(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { settings.overlayBehavior },
-                        set: {
-                            settings.overlayBehavior = $0
-                            state.overlay.behavior = $0
-                        })
-                ) {
-                    ForEach(OverlayBehavior.allCases, id: \.self) { Text($0.displayName(for: lang)).tag($0) }
-                }
-                .labelsHidden()
-                .frame(maxWidth: 200)
-            }
-            SettingsRow(label: L10n.hideAfter(lang)) {
-                HStack(spacing: 8) {
-                    Slider(
-                        value: Binding(
-                            get: { settings.hideAfter },
-                            set: {
-                                settings.hideAfter = $0
-                                state.overlay.hideAfter = $0
-                            }), in: 5...60, step: 1
-                    )
-                    .disabled(settings.neverHide)
-                    Text(L10n.seconds(lang, Int(settings.hideAfter)))
-                        .monospacedDigit()
-                        .frame(width: 56, alignment: .trailing)
-                }
-            }
-            SettingsRow(label: L10n.neverHide(lang)) {
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { settings.neverHide },
-                        set: {
-                            settings.neverHide = $0
-                            state.overlay.neverHide = $0
-                        })
-                )
-                .labelsHidden()
-                .toggleStyle(.checkbox)
-            }
-            SettingsRow(label: "") {
-                Button(L10n.previewOverlay(lang)) { state.showOverlayTest() }
-                    .buttonStyle(.bordered)
-            }
-        }
-    }
-
-    private var privacyPage: some View {
-        settingsPage(title: L10n.tabPrivacy(lang)) {
-            Text(L10n.privacyExplanation(lang))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(Array(state.settings.excludedBundleIDs).sorted(), id: \.self) { bundleID in
-                ExcludedAppRow(bundleID: bundleID, language: lang) {
-                    state.settings.excludedBundleIDs.remove(bundleID)
-                    state.input.excludedBundleIDs = state.settings.excludedBundleIDs
-                    state.monitor.excludedBundleIDs = state.settings.excludedBundleIDs
-                }
-            }
-            SettingsRow(label: "") {
-                Button(L10n.addApplication(lang)) { AddExcludedAppView.openPanel(state: state) }
-            }
-        }
-    }
-
-    private var historyPage: some View {
-        settingsPage(title: L10n.tabHistory(lang)) {
-            SettingsRow(label: L10n.historyRetention(lang)) {
-                Picker(
-                    "",
-                    selection: Binding(
-                        get: { settings.historyRetention },
-                        set: { settings.historyRetention = $0 })) {
-                    ForEach(HistoryRetention.allCases) { retention in
-                        Text(L10n.historyRetentionName(retention, lang)).tag(retention)
-                    }
-                }
-                .labelsHidden()
-                .frame(width: 160)
-            }
-            HStack {
-                Text(L10n.historyStorageHint(lang))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button(L10n.historyClear(lang), role: .destructive) {
-                    showingClearHistoryConfirmation = true
-                }
-                .controlSize(.small)
-                .disabled(history.entries.isEmpty)
-                Menu {
-                    Button(L10n.historyExportMarkdown(lang)) { exportHistory(.markdown) }
-                    Button(L10n.historyExportExcel(lang)) { exportHistory(.excel) }
-                } label: {
-                    Label(L10n.historyExport(lang), systemImage: "square.and.arrow.up")
-                }
-            }
-            .confirmationDialog(
-                L10n.historyClearConfirm(lang),
-                isPresented: $showingClearHistoryConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(L10n.historyClearAction(lang), role: .destructive) {
-                    history.clearAll()
-                    historyExportMessage = nil
-                }
-                Button(L10n.cancelAction(lang), role: .cancel) {}
-            }
-
-            if let historyExportMessage {
-                Text(historyExportMessage)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            if let errorMessage = history.errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            } else if history.entries.isEmpty {
-                Text(L10n.historyEmpty(lang))
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 12)
-            } else {
-                historyTable
-            }
-        }
-        .task { history.reload(retention: settings.historyRetention) }
-    }
-
-    private var historyTable: some View {
-        LazyVStack(alignment: .leading, spacing: 12) {
-            ForEach(historyDayGroups) { group in
-                Text(historyDayString(group.day))
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.top, 4)
-                HStack(alignment: .top, spacing: 12) {
-                    Text(L10n.historyIndex(lang)).frame(width: 42, alignment: .trailing)
-                    Text(L10n.historyOriginal(lang)).frame(maxWidth: .infinity, alignment: .leading)
-                    Text(L10n.historyTranslation(lang)).frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-                ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text("\(index + 1)")
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                            .frame(width: 42, alignment: .trailing)
-                        Text(entry.sourceText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text(entry.translatedText)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .font(.callout)
-                    Divider()
-                }
-            }
-        }
-    }
-
-    private var historyDayGroups: [HistoryDayGroup] {
-        let calendar = Calendar.current
-        var groups: [HistoryDayGroup] = []
-        for entry in history.entries {
-            let day = calendar.startOfDay(for: entry.createdAt)
-            if let last = groups.indices.last, calendar.isDate(groups[last].day, inSameDayAs: day) {
-                groups[last].entries.append(entry)
-            } else {
-                groups.append(HistoryDayGroup(day: day, entries: [entry]))
-            }
-        }
-        return groups
-    }
-
-    private func historyDayString(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
-
-    private func exportHistory(_ format: HistoryExportFormat) {
-        let panel = NSSavePanel()
-        panel.nameFieldStringValue = "FloatTrans-history.\(format.fileExtension)"
-        panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .data]
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
-            do {
-                try TranslationHistoryExporter.export(history.entries, format: format, language: lang, to: url)
-                historyExportMessage = url.lastPathComponent
-            } catch {
-                historyExportMessage = error.localizedDescription
-            }
-        }
-    }
-
-    private var aboutPage: some View {
-        settingsPage(title: L10n.tabAbout(lang)) {
-            AboutView(language: lang)
-                .frame(maxWidth: .infinity)
-        }
-    }
-
-    private func settingsPage<Content: View>(title: String, @ViewBuilder content: @escaping () -> Content) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Color.accentColor)
-                    Text(title)
-                        .font(.title2.bold())
-                    Spacer()
-                }
-                SettingsPanel { content() }
-            }
-            .padding(.horizontal, 28)
-            .padding(.vertical, 24)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(Color(nsColor: .windowBackgroundColor).opacity(0.72))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
-private struct HistoryDayGroup: Identifiable {
-    let day: Date
-    var entries: [TranslationHistoryEntry]
-    var id: Date { day }
+/// A titled group card: section header above a rounded, hairline-stroked
+/// container whose rows sit on the control background.
+struct SettingsGroup<Content: View>: View {
+    let title: String
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+            VStack(alignment: .leading, spacing: 0) {
+                content()
+            }
+            .background(Color(nsColor: .controlBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+            }
+        }
+    }
+}
+
+/// Small helper for picker-style trailing controls with a fixed width.
+struct TrailingPicker<Selection: Hashable, Options: View>: View {
+    var width: CGFloat = 180
+    @Binding var selection: Selection
+    @ViewBuilder var content: () -> Options
+
+    var body: some View {
+        Picker("", selection: $selection) {
+            content()
+        }
+        .labelsHidden()
+        .controlSize(.regular)
+        .frame(width: width)
+    }
 }
 
 struct ExcludedAppRow: View {
@@ -933,6 +104,8 @@ struct ExcludedAppRow: View {
             }
             .buttonStyle(.plain)
         }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 }
 
@@ -946,6 +119,7 @@ struct ShortcutRecorderButton: View {
         Button(recording ? L10n.shortcutRecording(language) : shortcut.displayString) {
             recording = true
         }
+        .controlSize(.regular)
         .background {
             ShortcutKeyMonitor(isActive: $recording) { event in
                 if UInt32(event.keyCode) == ReplaceShortcut.escapeKeyCode {
@@ -1038,9 +212,6 @@ struct LLMModelEditor: View {
         remove: @escaping () -> Void
     ) {
         var initialDraft = model
-        // Older saved configurations used an empty string to mean the
-        // built-in prompt. Show the actual default in the editor so it can be
-        // reviewed and modified without asking the user to reconstruct it.
         if initialDraft.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             initialDraft.systemPrompt = LLMTranslationPrompt.defaultSystemPrompt
         }
@@ -1084,63 +255,61 @@ struct LLMModelEditor: View {
             if isExpanded {
                 Divider()
                 VStack(alignment: .leading, spacing: 10) {
-                SettingsRow(label: L10n.modelName(language)) {
-                    TextField(L10n.modelPlaceholder(language), text: $draft.name).textFieldStyle(.roundedBorder)
-                }
-                SettingsRow(label: L10n.provider(language)) {
-                    Picker("", selection: $draft.provider) {
-                        ForEach(LLMProvider.allCases) { provider in
-                            Text(L10n.providerName(provider, language)).tag(provider)
-                        }
+                    LabeledField(label: L10n.modelName(language)) {
+                        TextField(L10n.modelPlaceholder(language), text: $draft.name).textFieldStyle(.roundedBorder)
                     }
-                    .labelsHidden()
-                    .onChange(of: draft.provider) { _, provider in
-                        if draft.baseURL.isEmpty || draft.baseURL == LLMProvider.openAICompatible.defaultBaseURL {
-                            draft.baseURL = provider.defaultBaseURL
-                        }
-                        if draft.model.isEmpty { draft.model = provider.defaultModel }
-                    }
-                }
-                SettingsRow(label: L10n.endpointURL(language)) {
-                    TextField(L10n.urlPlaceholder(language), text: $draft.baseURL).textFieldStyle(.roundedBorder)
-                }
-                SettingsRow(label: L10n.apiKey(language)) {
-                    SecureField("", text: $draft.apiKey).textFieldStyle(.roundedBorder)
-                }
-                SettingsRow(label: L10n.modelID(language)) {
-                    TextField(L10n.modelIDPlaceholder(language), text: $draft.model).textFieldStyle(.roundedBorder)
-                }
-                SettingsRow(label: L10n.thinkingMode(language)) {
-                    Picker("", selection: $draft.thinking) {
-                        ForEach(LLMThinkingMode.allCases) { mode in
-                            Text(thinkingName(mode)).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.segmented)
-                }
-                SettingsRow(label: L10n.prompt(language)) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        TextEditor(text: $draft.systemPrompt)
-                            .frame(minHeight: 110)
-                            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.secondary.opacity(0.25)))
-                        HStack {
-                            Text(L10n.promptHint(language))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            Button(L10n.restoreDefaultPrompt(language)) {
-                                draft.systemPrompt = LLMTranslationPrompt.defaultSystemPrompt
+                    LabeledField(label: L10n.provider(language)) {
+                        Picker("", selection: $draft.provider) {
+                            ForEach(LLMProvider.allCases) { provider in
+                                Text(L10n.providerName(provider, language)).tag(provider)
                             }
-                            .controlSize(.small)
+                        }
+                        .onChange(of: draft.provider) { _, provider in
+                            if draft.baseURL.isEmpty || draft.baseURL == LLMProvider.openAICompatible.defaultBaseURL {
+                                draft.baseURL = provider.defaultBaseURL
+                            }
+                            if draft.model.isEmpty { draft.model = provider.defaultModel }
                         }
                     }
-                }
-                HStack {
-                    Toggle(L10n.modelEnabled(language), isOn: $draft.enabled).toggleStyle(.checkbox)
-                    Spacer()
-                    Button(L10n.removeModel(language), role: .destructive, action: remove)
-                }
+                    LabeledField(label: L10n.endpointURL(language)) {
+                        TextField(L10n.urlPlaceholder(language), text: $draft.baseURL).textFieldStyle(.roundedBorder)
+                    }
+                    LabeledField(label: L10n.apiKey(language)) {
+                        SecureField("", text: $draft.apiKey).textFieldStyle(.roundedBorder)
+                    }
+                    LabeledField(label: L10n.modelID(language)) {
+                        TextField(L10n.modelIDPlaceholder(language), text: $draft.model).textFieldStyle(.roundedBorder)
+                    }
+                    LabeledField(label: L10n.thinkingMode(language)) {
+                        Picker("", selection: $draft.thinking) {
+                            ForEach(LLMThinkingMode.allCases) { mode in
+                                Text(thinkingName(mode)).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                    LabeledField(label: L10n.prompt(language)) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            TextEditor(text: $draft.systemPrompt)
+                                .frame(minHeight: 110)
+                                .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.secondary.opacity(0.25)))
+                            HStack {
+                                Text(L10n.promptHint(language))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button(L10n.restoreDefaultPrompt(language)) {
+                                    draft.systemPrompt = LLMTranslationPrompt.defaultSystemPrompt
+                                }
+                                .controlSize(.small)
+                            }
+                        }
+                    }
+                    HStack {
+                        Toggle(L10n.modelEnabled(language), isOn: $draft.enabled).toggleStyle(.checkbox)
+                        Spacer()
+                        Button(L10n.removeModel(language), role: .destructive, action: remove)
+                    }
                 }
                 .padding(.top, 2)
             }
@@ -1153,6 +322,19 @@ struct LLMModelEditor: View {
         case .automatic: return L10n.thinkingAutomatic(language)
         case .nonThinking: return L10n.thinkingOff(language)
         case .thinking: return L10n.thinkingOn(language)
+        }
+    }
+}
+
+/// Label-over-field stack used inside expanded model editors.
+struct LabeledField<Field: View>: View {
+    let label: String
+    @ViewBuilder var field: () -> Field
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label).font(.caption.weight(.medium)).foregroundStyle(.secondary)
+            field()
         }
     }
 }
@@ -1253,4 +435,801 @@ struct LanguageResourceRow: View {
         default: packState = .available
         }
     }
+}
+
+struct OverlayPositionPicker: View {
+    @Binding var selection: OverlayPosition
+    let language: UILanguage
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ForEach(OverlayPosition.allCases, id: \.self) { position in
+                Button {
+                    selection = position
+                } label: {
+                    VStack(spacing: 6) {
+                        OverlayPositionThumbnail(position: position, isSelected: selection == position)
+                        Text(position.displayName(for: language))
+                            .font(.caption)
+                            .foregroundStyle(selection == position ? .primary : .secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+}
+
+struct OverlayPositionThumbnail: View {
+    let position: OverlayPosition
+    let isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .fill(Color.secondary.opacity(0.08))
+            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                .stroke(isSelected ? Color.accentColor : Color.secondary.opacity(0.45), lineWidth: isSelected ? 2 : 1)
+            GeometryReader { geo in
+                RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    .fill(isSelected ? Color.accentColor : Color.primary.opacity(0.55))
+                    .frame(width: geo.size.width * 0.36, height: 5)
+                    .position(indicatorCenter(in: geo.size))
+            }
+            .padding(1)
+        }
+        .frame(width: 64, height: 40)
+    }
+
+    private func indicatorCenter(in size: CGSize) -> CGPoint {
+        let inset: CGFloat = 8
+        switch position {
+        case .topRight:
+            return CGPoint(x: size.width - inset - size.width * 0.18, y: inset + 2.5)
+        case .bottomCenter:
+            return CGPoint(x: size.width / 2, y: size.height - inset - 2.5)
+        case .bottomRight:
+            return CGPoint(x: size.width - inset - size.width * 0.18, y: size.height - inset - 2.5)
+        }
+    }
+}
+
+// MARK: - Settings view
+
+struct SettingsView: View {
+    private enum Page: String, CaseIterable, Identifiable {
+        case general, translation, overlay, history, privacy, about
+
+        var id: String { rawValue }
+
+        var systemImage: String {
+            switch self {
+            case .general: return "gearshape"
+            case .translation: return "character.bubble"
+            case .overlay: return "photo.on.rectangle"
+            case .history: return "clock"
+            case .privacy: return "lock"
+            case .about: return "info.circle"
+            }
+        }
+
+        var tint: Color {
+            switch self {
+            case .general: return .gray
+            case .translation: return .blue
+            case .overlay: return .purple
+            case .history: return .orange
+            case .privacy: return .red
+            case .about: return .green
+            }
+        }
+
+        func title(_ lang: UILanguage) -> String {
+            switch self {
+            case .general: return L10n.tabGeneral(lang)
+            case .translation: return L10n.tabTranslation(lang)
+            case .overlay: return L10n.tabOverlay(lang)
+            case .history: return L10n.tabHistory(lang)
+            case .privacy: return L10n.tabPrivacy(lang)
+            case .about: return L10n.tabAbout(lang)
+            }
+        }
+    }
+
+    @ObservedObject var state: AppState
+    @ObservedObject private var settings: SettingsStore
+    @ObservedObject private var history: TranslationHistoryController
+    @State private var selectedPage: Page = .general
+    @State private var draggedModelID: UUID?
+    @State private var historyExportMessage: String?
+    @State private var showingClearHistoryConfirmation = false
+
+    init(state: AppState) {
+        self.state = state
+        self._settings = ObservedObject(wrappedValue: state.settings)
+        self._history = ObservedObject(wrappedValue: state.history)
+    }
+
+    private var lang: UILanguage { settings.uiLanguage }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            sidebar
+            Divider()
+            contentArea
+        }
+        .frame(minWidth: 820, idealWidth: 900, minHeight: 560, idealHeight: 680)
+        .onAppear { state.updateSettingsWindowTitle() }
+        .onChange(of: settings.uiLanguage) { _, _ in state.updateSettingsWindowTitle() }
+    }
+
+    // MARK: Sidebar
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Page.allCases) { page in
+                sidebarButton(page)
+            }
+            Spacer()
+            Text("Pico v\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 6)
+        }
+        .padding(.horizontal, 10)
+        .padding(.top, 12)
+        .frame(width: 200)
+        .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private func sidebarButton(_ page: Page) -> some View {
+        let selected = selectedPage == page
+        return Button {
+            selectedPage = page
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: page.systemImage)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 24, height: 24)
+                    .background(page.tint.opacity(0.85), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                Text(page.title(lang))
+                    .font(.system(size: 13))
+                    .foregroundStyle(selected ? .primary : .secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                selected ? Color.primary.opacity(0.09) : Color.clear,
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    // MARK: Content
+
+    private var contentArea: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Text(selectedPage.title(lang))
+                    .font(.title2.bold())
+                pageContent
+            }
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Color(nsColor: .controlBackgroundColor))
+    }
+
+    @ViewBuilder
+    private var pageContent: some View {
+        switch selectedPage {
+        case .general: generalPage
+        case .translation: translationPage
+        case .overlay: overlayPage
+        case .history: historyPage
+        case .privacy: privacyPage
+        case .about: aboutPage
+        }
+    }
+
+    private func smallToggle(_ binding: Binding<Bool>) -> some View {
+        Toggle("", isOn: binding)
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+    }
+
+    // MARK: General
+
+    private var generalPage: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsGroup(title: L10n.groupLaunchTitle(lang)) {
+                SettingsRow(label: L10n.enableLiveTranslation(lang)) {
+                    smallToggle(Binding(
+                        get: { state.enabled },
+                        set: { _ in state.toggle() }))
+                }
+                SettingsRow(label: L10n.launchAtLogin(lang), divider: false) {
+                    smallToggle($state.settings.launchAtLogin)
+                }
+            }
+            SettingsGroup(title: L10n.groupLanguageTitle(lang)) {
+                SettingsRow(label: L10n.interfaceLanguage(lang)) {
+                    TrailingPicker(width: 160, selection: $settings.uiLanguage) {
+                        ForEach(UILanguage.allCases) { language in
+                            Text(language.pickerLabel).tag(language)
+                        }
+                    }
+                }
+                SettingsRow(label: L10n.accessibility(lang), divider: false) {
+                    if state.permissionGranted {
+                        Text(L10n.permissionGranted(lang))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button(L10n.openSystemSettings(lang)) { state.requestPermission() }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Translation
+
+    private var translationPage: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsGroup(title: L10n.groupEngineTitle(lang)) {
+                SettingsRow(label: L10n.translationBackend(lang)) {
+                    TrailingPicker(width: 200, selection: $settings.translationBackend) {
+                        ForEach(TranslationBackend.allCases) { backend in
+                            Text(backend.displayName(for: lang)).tag(backend)
+                        }
+                    }
+                }
+                if settings.translationBackend == .local {
+                    SettingsRow(label: L10n.languageResources(lang), divider: false) {
+                        LanguageResourceRow(
+                            language: lang,
+                            sourceLanguage: settings.sourceLanguage,
+                            targetLanguage: settings.targetLanguage)
+                    }
+                }
+            }
+            SettingsGroup(title: L10n.groupLanguagesTitle(lang)) {
+                SettingsRow(label: L10n.sourceLanguage(lang)) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { settings.sourceLanguage },
+                        set: { source in
+                            settings.sourceLanguage = source
+                            if settings.targetLanguage == source {
+                                settings.targetLanguage = source == .english ? .chinese : .english
+                            }
+                        })) {
+                        ForEach(Language.allCases) { language in
+                            Text(languageName(language)).tag(language)
+                        }
+                    }
+                }
+                SettingsRow(label: L10n.targetLanguage(lang)) {
+                    TrailingPicker(width: 160, selection: $settings.targetLanguage) {
+                        ForEach(Language.allCases.filter { $0 != settings.sourceLanguage }) { language in
+                            Text(languageName(language)).tag(language)
+                        }
+                    }
+                }
+            }
+            SettingsGroup(title: L10n.groupLiveInputTitle(lang)) {
+                SettingsRow(label: L10n.translationSpeed(lang)) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { state.settings.translationSpeed },
+                        set: {
+                            state.settings.translationSpeed = $0
+                            state.input.delayMilliseconds = $0
+                        })) {
+                        Text(L10n.speedFast(lang)).tag(300)
+                        Text(L10n.speedBalanced(lang)).tag(450)
+                        Text(L10n.speedRelaxed(lang)).tag(700)
+                    }
+                }
+                SettingsRow(label: L10n.translationTiming(lang), divider: settings.translationTiming == .shortcut) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { settings.translationTiming },
+                        set: { state.setTranslationTiming($0) })) {
+                        ForEach(TranslationTiming.allCases, id: \.self) { mode in
+                            Text(mode.displayName(for: lang)).tag(mode)
+                        }
+                    }
+                }
+                if settings.translationTiming == .shortcut {
+                    SettingsRow(label: L10n.translateShortcut(lang), divider: false) {
+                        ShortcutRecorderButton(
+                            language: lang,
+                            shortcut: settings.translateShortcut,
+                            onCommit: { state.setTranslateShortcut($0) })
+                    }
+                }
+            }
+            if settings.translationBackend != .local {
+                modelSettingsSection
+            }
+            SettingsGroup(title: L10n.groupActions(lang)) {
+                SettingsRow(label: L10n.replaceOriginal(lang)) {
+                    smallToggle(Binding(
+                        get: { settings.replaceOriginal },
+                        set: { state.setReplaceOriginal($0) }))
+                }
+                if settings.replaceOriginal {
+                    SettingsRow(label: L10n.replaceShortcut(lang)) {
+                        ShortcutRecorderButton(
+                            language: lang,
+                            shortcut: settings.replaceShortcut,
+                            onCommit: { state.setReplaceShortcut($0) })
+                    }
+                }
+                SettingsRow(label: L10n.copyTranslation(lang)) {
+                    smallToggle(Binding(
+                        get: { settings.copyTranslation },
+                        set: { state.setCopyTranslation($0) }))
+                }
+                if settings.copyTranslation {
+                    SettingsRow(label: L10n.copyShortcut(lang), divider: false) {
+                        ShortcutRecorderButton(
+                            language: lang,
+                            shortcut: settings.copyShortcut,
+                            onCommit: { state.setCopyShortcut($0) })
+                    }
+                }
+            }
+            SettingsGroup(title: L10n.groupSpeech(lang)) {
+                SettingsRow(label: L10n.readTranslationsAloud(lang), divider: false) {
+                    Menu {
+                        Toggle(L10n.speechTimingAll(lang), isOn: allSpeechTriggersBinding)
+                        Divider()
+                        ForEach(SpeechTrigger.allCases) { trigger in
+                            Toggle(speechTriggerName(trigger), isOn: speechTriggerBinding(trigger))
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text(L10n.speechTimingSummary(settings.speechTriggers, lang))
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .fixedSize()
+                }
+            }
+            Text(L10n.speechVoiceHint(settings.targetLanguage, lang))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            SettingsGroup(title: L10n.clipboardGroup(lang)) {
+                SettingsRow(label: L10n.clipboardTranslate(lang), divider: settings.clipboardTriggerMode == .hotkey) {
+                    smallToggle($settings.clipboardTranslationEnabled)
+                }
+                if settings.clipboardTranslationEnabled {
+                    if settings.clipboardTriggerMode == .hotkey {
+                        SettingsRow(label: L10n.clipboardShortcut(lang), divider: false) {
+                            ShortcutRecorderButton(
+                                language: lang,
+                                shortcut: settings.clipboardShortcut,
+                                onCommit: { settings.clipboardShortcut = $0 })
+                        }
+                    } else {
+                        SettingsRow(label: L10n.clipboardTrigger(lang), divider: false) {
+                            TrailingPicker(width: 160, selection: $settings.clipboardTriggerMode) {
+                                ForEach(ClipboardTriggerMode.allCases, id: \.self) { mode in
+                                    Text(mode.displayName(for: lang)).tag(mode)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if settings.clipboardTranslationEnabled {
+                Text(L10n.clipboardHint(lang))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var allSpeechTriggersBinding: Binding<Bool> {
+        Binding(
+            get: { settings.speechTriggers == .all },
+            set: { setSpeechTriggers($0 ? .all : []) })
+    }
+
+    private func speechTriggerBinding(_ trigger: SpeechTrigger) -> Binding<Bool> {
+        let selection = SpeechTriggerSelection(rawValue: trigger.rawValue)
+        return Binding(
+            get: { settings.speechTriggers.contains(selection) },
+            set: { enabled in
+                var updated = settings.speechTriggers
+                if enabled {
+                    updated.insert(selection)
+                } else {
+                    updated.remove(selection)
+                }
+                setSpeechTriggers(updated)
+            })
+    }
+
+    private func setSpeechTriggers(_ triggers: SpeechTriggerSelection) {
+        settings.speechTriggers = triggers
+        if triggers.isEmpty { state.speech.stop() }
+    }
+
+    private func speechTriggerName(_ trigger: SpeechTrigger) -> String {
+        switch trigger {
+        case .pause: return L10n.speechTimingPause(lang)
+        case .completeSentence: return L10n.speechTimingCompleteSentence(lang)
+        case .shortcut: return L10n.speechTimingShortcut(lang)
+        }
+    }
+
+    private var languageName: (Language) -> String {
+        { lang == .chinese ? $0.chineseName : $0.englishName }
+    }
+
+    @ViewBuilder
+    private var modelSettingsSection: some View {
+        SettingsGroup(title: L10n.modelSettings(lang)) {
+            SettingsRow(label: L10n.failoverTimeout(lang), divider: settings.llmModels.isEmpty) {
+                HStack(spacing: 8) {
+                    Slider(value: $settings.llmFallbackTimeout, in: 1...120, step: 1)
+                        .frame(width: 130)
+                    Text(L10n.timeoutSeconds(lang, Int(settings.llmFallbackTimeout)))
+                        .monospacedDigit()
+                        .frame(width: 96, alignment: .trailing)
+                }
+            }
+        }
+        Text(L10n.apiKeyKeychainHint(lang))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        if settings.llmModels.isEmpty {
+            Group {
+                Button(L10n.addModel(lang)) { settings.addLLMModel(defaultModel()) }
+                    .buttonStyle(.bordered)
+            }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(settings.llmModels) { model in
+                    LLMModelEditor(
+                        model: model,
+                        language: lang,
+                        save: { settings.updateLLMModel($0) },
+                        remove: { settings.removeLLMModel(id: model.id) })
+                        .padding(12)
+                        .background(
+                            Color(nsColor: .controlBackgroundColor),
+                            in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                        }
+                        .onDrag {
+                            draggedModelID = model.id
+                            return NSItemProvider(object: model.id.uuidString as NSString)
+                        }
+                        .onDrop(
+                            of: [.text],
+                            delegate: ModelOrderDropDelegate(
+                                targetID: model.id,
+                                models: $settings.llmModels,
+                                draggedID: $draggedModelID))
+                }
+            }
+        }
+        Text(L10n.llmTranslationPrivacy(lang))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    private func defaultModel() -> LLMModelConfiguration {
+        LLMModelConfiguration(
+            name: lang == .chinese ? "新的 API 模型" : "New API Model",
+            provider: .openAICompatible,
+            baseURL: LLMProvider.openAICompatible.defaultBaseURL,
+            model: LLMProvider.openAICompatible.defaultModel,
+            timeoutSeconds: 0)
+    }
+
+    // MARK: Overlay
+
+    private var overlayPage: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsGroup(title: L10n.groupPosition(lang)) {
+                SettingsRow(label: L10n.displayPosition(lang), divider: false) {
+                    OverlayPositionPicker(
+                        selection: Binding(
+                            get: { settings.overlayPosition },
+                            set: {
+                                settings.overlayPosition = $0
+                                state.overlay.position = $0
+                            }),
+                        language: lang)
+                }
+            }
+            SettingsGroup(title: L10n.groupAppearance(lang)) {
+                SettingsRow(label: L10n.textSize(lang)) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { settings.textSize },
+                        set: {
+                            settings.textSize = $0
+                            state.overlay.textSize = $0
+                        })) {
+                        ForEach(OverlayTextSize.allCases, id: \.self) { Text($0.displayName(for: lang)).tag($0) }
+                    }
+                }
+                SettingsRow(label: L10n.edgeDistance(lang)) {
+                    HStack(spacing: 8) {
+                        Slider(
+                            value: Binding(
+                                get: { settings.overlayEdgeDistance },
+                                set: {
+                                    settings.overlayEdgeDistance = $0
+                                    state.overlay.edgeDistance = $0
+                                }), in: 0...300, step: 4)
+                            .frame(width: 130)
+                        Text("\(Int(settings.overlayEdgeDistance))")
+                            .monospacedDigit()
+                            .frame(width: 36, alignment: .trailing)
+                    }
+                }
+                SettingsRow(label: L10n.overlayOpacity(lang)) {
+                    HStack(spacing: 8) {
+                        Slider(
+                            value: Binding(
+                                get: { settings.overlayOpacity },
+                                set: {
+                                    settings.overlayOpacity = $0
+                                    state.overlay.cardOpacity = $0
+                                }), in: 0.3...1, step: 0.05)
+                            .frame(width: 130)
+                        Text("\(Int((settings.overlayOpacity * 100).rounded()))%")
+                            .monospacedDigit()
+                            .frame(width: 44, alignment: .trailing)
+                    }
+                }
+                SettingsRow(label: L10n.overlayTheme(lang)) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { settings.overlayTheme },
+                        set: {
+                            settings.overlayTheme = $0
+                            state.overlay.theme = $0
+                        })) {
+                        ForEach(OverlayTheme.allCases, id: \.self) { theme in
+                            Text(theme.displayName(for: lang)).tag(theme)
+                        }
+                    }
+                }
+                SettingsRow(label: L10n.overlaySurface(lang), divider: false) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { settings.overlaySurface },
+                        set: {
+                            settings.overlaySurface = $0
+                            state.overlay.surface = $0
+                        })) {
+                        ForEach(OverlaySurfaceEffect.allCases, id: \.self) { effect in
+                            Text(effect.displayName(for: lang)).tag(effect)
+                        }
+                    }
+                }
+            }
+            SettingsGroup(title: L10n.groupBehavior(lang)) {
+                SettingsRow(label: L10n.newTranslationBehavior(lang)) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { settings.overlayBehavior },
+                        set: {
+                            settings.overlayBehavior = $0
+                            state.overlay.behavior = $0
+                        })) {
+                        ForEach(OverlayBehavior.allCases, id: \.self) { Text($0.displayName(for: lang)).tag($0) }
+                    }
+                }
+                SettingsRow(label: L10n.hideAfter(lang)) {
+                    HStack(spacing: 8) {
+                        Slider(
+                            value: Binding(
+                                get: { settings.hideAfter },
+                                set: {
+                                    settings.hideAfter = $0
+                                    state.overlay.hideAfter = $0
+                                }), in: 5...60, step: 1)
+                            .frame(width: 130)
+                            .disabled(settings.neverHide)
+                        Text(L10n.seconds(lang, Int(settings.hideAfter)))
+                            .monospacedDigit()
+                            .frame(width: 56, alignment: .trailing)
+                    }
+                }
+                SettingsRow(label: L10n.neverHide(lang), divider: false) {
+                    smallToggle(Binding(
+                        get: { settings.neverHide },
+                        set: {
+                            settings.neverHide = $0
+                            state.overlay.neverHide = $0
+                        }))
+                }
+            }
+            Group {
+                Button(L10n.previewOverlay(lang)) { state.showOverlayTest() }
+                    .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    // MARK: History
+
+    private var historyPage: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            SettingsGroup(title: L10n.groupHistoryTitle(lang)) {
+                SettingsRow(label: L10n.historyRetention(lang)) {
+                    TrailingPicker(width: 160, selection: Binding(
+                        get: { settings.historyRetention },
+                        set: { settings.historyRetention = $0 })) {
+                        ForEach(HistoryRetention.allCases) { retention in
+                            Text(L10n.historyRetentionName(retention, lang)).tag(retention)
+                        }
+                    }
+                }
+                SettingsRow(label: L10n.historyExport(lang), divider: false) {
+                    HStack(spacing: 8) {
+                        Button(L10n.historyClear(lang), role: .destructive) {
+                            showingClearHistoryConfirmation = true
+                        }
+                        .controlSize(.small)
+                        .disabled(history.entries.isEmpty)
+                        Menu {
+                            Button(L10n.historyExportMarkdown(lang)) { exportHistory(.markdown) }
+                            Button(L10n.historyExportExcel(lang)) { exportHistory(.excel) }
+                        } label: {
+                            Label(L10n.historyExport(lang), systemImage: "square.and.arrow.up")
+                        }
+                    }
+                    .confirmationDialog(
+                        L10n.historyClearConfirm(lang),
+                        isPresented: $showingClearHistoryConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button(L10n.historyClearAction(lang), role: .destructive) {
+                            history.clearAll()
+                            historyExportMessage = nil
+                        }
+                        Button(L10n.cancelAction(lang), role: .cancel) {}
+                    }
+                }
+            }
+            if let historyExportMessage {
+                Text(historyExportMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let errorMessage = history.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            } else if history.entries.isEmpty {
+                Text(L10n.historyEmpty(lang))
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 12)
+            } else {
+                historyTable
+            }
+        }
+        .task { history.reload(retention: settings.historyRetention) }
+    }
+
+    private var historyTable: some View {
+        LazyVStack(alignment: .leading, spacing: 12) {
+            ForEach(historyDayGroups) { group in
+                Text(historyDayString(group.day))
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.top, 4)
+                HStack(alignment: .top, spacing: 12) {
+                    Text(L10n.historyIndex(lang)).frame(width: 42, alignment: .trailing)
+                    Text(L10n.historyOriginal(lang)).frame(maxWidth: .infinity, alignment: .leading)
+                    Text(L10n.historyTranslation(lang)).frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+                ForEach(Array(group.entries.enumerated()), id: \.element.id) { index, entry in
+                    HStack(alignment: .top, spacing: 12) {
+                        Text("\(index + 1)")
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
+                            .frame(width: 42, alignment: .trailing)
+                        Text(entry.sourceText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text(entry.translatedText)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .font(.callout)
+                    Divider()
+                }
+            }
+        }
+    }
+
+    private var historyDayGroups: [HistoryDayGroup] {
+        let calendar = Calendar.current
+        var groups: [HistoryDayGroup] = []
+        for entry in history.entries {
+            let day = calendar.startOfDay(for: entry.createdAt)
+            if let last = groups.indices.last, calendar.isDate(groups[last].day, inSameDayAs: day) {
+                groups[last].entries.append(entry)
+            } else {
+                groups.append(HistoryDayGroup(day: day, entries: [entry]))
+            }
+        }
+        return groups
+    }
+
+    private func historyDayString(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private func exportHistory(_ format: HistoryExportFormat) {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "FloatTrans-history.\(format.fileExtension)"
+        panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .data]
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            do {
+                try TranslationHistoryExporter.export(history.entries, format: format, language: lang, to: url)
+                historyExportMessage = url.lastPathComponent
+            } catch {
+                historyExportMessage = error.localizedDescription
+            }
+        }
+    }
+
+    // MARK: Privacy
+
+    private var privacyPage: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text(L10n.privacyExplanation(lang))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            SettingsGroup(title: L10n.groupExcludedAppsTitle(lang)) {
+                ForEach(Array(state.settings.excludedBundleIDs).sorted(), id: \.self) { bundleID in
+                    ExcludedAppRow(bundleID: bundleID, language: lang) {
+                        state.settings.excludedBundleIDs.remove(bundleID)
+                        state.input.excludedBundleIDs = state.settings.excludedBundleIDs
+                        state.monitor.excludedBundleIDs = state.settings.excludedBundleIDs
+                    }
+                }
+                SettingsRow(label: "", divider: false) {
+                    Button(L10n.addApplication(lang)) { AddExcludedAppView.openPanel(state: state) }
+                        .controlSize(.small)
+                }
+            }
+        }
+    }
+
+    // MARK: About
+
+    private var aboutPage: some View {
+        AboutView(language: lang)
+            .frame(maxWidth: .infinity)
+    }
+}
+
+private struct HistoryDayGroup: Identifiable {
+    let day: Date
+    var entries: [TranslationHistoryEntry]
+    var id: Date { day }
 }

@@ -43,8 +43,8 @@ struct GitHubLatestRelease: Decodable, Sendable {
 }
 
 struct UpdateChecker: Sendable {
-    static let latestReleaseURL = URL(string: "https://api.github.com/repos/asiyoua/floattrans/releases/latest")!
-    static let userAgent = "FloatTrans (https://github.com/asiyoua/floattrans)"
+    static let latestReleaseURL = URL(string: "https://api.github.com/repos/asiyoua/pico/releases/latest")!
+    static let userAgent = "FloatTrans (https://github.com/asiyoua/pico)"
 
     var currentVersion: String
     var fetch: @Sendable (URLRequest) async throws -> (Data, URLResponse)

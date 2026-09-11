@@ -1,7 +1,7 @@
 # Pico 皮可 · 随身实时翻译小助手（二创版）
 
 > 基于 [krisir/floattrans](https://github.com/krisir/floattrans)（MIT 许可）增强的二创版本。
-> **[下载最新版](https://github.com/asiyoua/floattrans/releases)** · 原项目主页：[krisir.github.io/floattrans](https://krisir.github.io/floattrans/)
+> **[下载最新版](https://github.com/asiyoua/pico/releases)** · 原项目主页：[krisir.github.io/floattrans](https://krisir.github.io/floattrans/)
 
 一款 macOS 实时翻译工具：读取支持无障碍（Accessibility）的文本输入框，按设定的语言方向翻译，以低打扰浮窗显示译文。默认使用 macOS 系统本地翻译，**内容不出设备**。
 
@@ -80,7 +80,7 @@
 
 ## 安装（普通用户）
 
-1. 从 [Releases](https://github.com/asiyoua/floattrans/releases) 下载 DMG，把Pico拖入「应用程序」
+1. 从 [Releases](https://github.com/asiyoua/pico/releases) 下载 DMG，把Pico拖入「应用程序」
 2. 首次打开：右键点击 → 「打开」（本地签名未公证，Gatekeeper 会询问一次）
 3. 「系统设置 → 隐私与安全性 → 辅助功能」中开启Pico
 4. 在设置 → 翻译中选择语言方向；微信里翻译用「复制 + ⌥⇧V」
@@ -169,4 +169,4 @@ Sources/LiveEnglish/
 
 - 原项目：[krisir/floattrans](https://github.com/krisir/floattrans)（MIT），感谢原作者的出色工作
 - 本仓库为二创增强版，同样以 MIT 许可发布
-- 问题与建议请提 [Issues](https://github.com/asiyoua/floattrans/issues)
+- 问题与建议请提 [Issues](https://github.com/asiyoua/pico/issues)

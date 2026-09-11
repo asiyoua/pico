@@ -459,6 +459,30 @@ enum L10n {
             : "Press the hotkey in any app to translate the clipboard. In auto-watch mode, copying text in the source language shows the translation."
     }
 
+    // MARK: - Settings groups
+
+    static func groupLaunchTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "启动" : "Launch"
+    }
+    static func groupLanguageTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "语言与权限" : "Language & Permission"
+    }
+    static func groupEngineTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "翻译引擎" : "Engine"
+    }
+    static func groupLanguagesTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "语言方向" : "Languages"
+    }
+    static func groupLiveInputTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "输入翻译" : "Live Input"
+    }
+    static func groupHistoryTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "保留与导出" : "Retention & Export"
+    }
+    static func groupExcludedAppsTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "排除的应用" : "Excluded Apps"
+    }
+
     // MARK: - History safety
 
     static func historyClear(_ lang: UILanguage) -> String {
