@@ -572,17 +572,9 @@ struct AboutView: View {
                 Text(statusText).font(.caption).foregroundStyle(.secondary)
             }
             Divider()
-            Text(L10n.aboutThanks(language))
-                .font(.caption)
-                .multilineTextAlignment(.center)
-                .foregroundStyle(.secondary)
             aboutLinkRow(
-                label: L10n.aboutOriginalRepo(language),
-                title: "github.com/krisir/floattrans",
-                urlString: "https://github.com/krisir/floattrans")
-            aboutLinkRow(
-                label: L10n.aboutForkRepo(language),
-                title: "github.com/asiyoua/floattrans",
+                label: L10n.aboutProjectRepo(language),
+                title: "github.com/asiyoua/pico",
                 urlString: "https://github.com/asiyoua/pico")
             aboutLinkRow(
                 label: L10n.aboutContactAuthor(language),

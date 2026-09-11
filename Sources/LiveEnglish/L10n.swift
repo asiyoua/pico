@@ -527,16 +527,8 @@ enum L10n {
             ? "一款安静、实时的多语言翻译工具。\n输入框实时翻译 + 剪贴板翻译，低打扰浮窗显示。\n默认本地翻译，内容不出设备。\n\nMIT 开源许可证"
             : "A quiet, real-time translation tool.\nLive input translation plus clipboard mode in a low-profile overlay.\nLocal by default; your text stays on device.\n\nMIT License"
     }
-    static func aboutThanks(_ lang: UILanguage) -> String {
-        lang == .chinese
-            ? "感谢原开发者 psychicsirk@gmail.com 的出色作品"
-            : "Thanks to the original developer psychicsirk@gmail.com"
-    }
-    static func aboutOriginalRepo(_ lang: UILanguage) -> String {
-        lang == .chinese ? "原仓库" : "Original repo"
-    }
-    static func aboutForkRepo(_ lang: UILanguage) -> String {
-        lang == .chinese ? "二创版本" : "Fork"
+    static func aboutProjectRepo(_ lang: UILanguage) -> String {
+        lang == .chinese ? "项目仓库" : "Repository"
     }
     static func aboutContactAuthor(_ lang: UILanguage) -> String {
         lang == .chinese ? "联系作者" : "Contact the author"
