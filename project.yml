@@ -26,7 +26,7 @@ targets:
     settings:
       base:
         PRODUCT_NAME: Pico
-        PRODUCT_BUNDLE_IDENTIFIER: cc.kristar.floattrans
+        PRODUCT_BUNDLE_IDENTIFIER: com.asiyoua.pico
         INFOPLIST_FILE: Resources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Resources/Pico.entitlements
         PRODUCT_MODULE_NAME: Pico

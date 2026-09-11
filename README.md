@@ -69,7 +69,7 @@ zsh Scripts/build-app.sh
 open FloatTrans.app
 ```
 
-应用包、可执行文件与显示名统一为 Pico（Bundle ID 保留 `cc.kristar.floattrans`，老用户设置与授权无缝延续）。打包 DMG：
+应用包、可执行文件与显示名统一为 Pico（Bundle ID 为 `com.asiyoua.pico`）。打包 DMG：
 
 ```sh
 zsh Scripts/build-dmg.sh

@@ -11,7 +11,7 @@
 	<key>CFBundleIconName</key>
 	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
-	<string>cc.kristar.floattrans</string>
+	<string>com.asiyoua.pico</string>
 	<key>CFBundleName</key>
 	<string>Pico</string>
 	<key>CFBundlePackageType</key>
