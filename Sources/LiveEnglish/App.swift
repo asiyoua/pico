@@ -190,9 +190,11 @@ struct MenuBarMenu: View {
         applyTranslationSettings()
         applyClipboardSettings()
         history.reload(retention: settings.historyRetention)
+        DiagnosticLog.write("init showWelcome=\(showWelcome) onboarded=\(UserDefaults.standard.bool(forKey: "onboardingComplete"))")
         if showWelcome {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .milliseconds(250))
+                DiagnosticLog.write("welcome task firing")
                 self?.presentWelcome()
             }
         }
@@ -286,6 +288,7 @@ struct MenuBarMenu: View {
         settingsWindow?.title = L10n.settingsWindowTitle(settings.uiLanguage)
     }
     private func presentWelcome() {
+        DiagnosticLog.write("presentWelcome called")
         guard welcomeWindow == nil else { return }
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 360), styleMask: [.titled, .closable],
