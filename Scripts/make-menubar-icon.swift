@@ -5,14 +5,15 @@
 import AppKit
 
 func boltPath(in size: CGFloat) -> NSBezierPath {
-    let s = size / 64.0
+    // The bolt occupies ~66% of the canvas so its optical size matches
+    // standard menu bar glyphs (Wi-Fi, battery, etc.).
+    let points = [(38.0, 4.0), (14.0, 36.0), (28.0, 36.0), (24.0, 60.0), (50.0, 26.0), (34.0, 26.0)]
+    let scale = size / 64.0 * 0.66
+    let center = size / 2
     let path = NSBezierPath()
-    path.move(to: NSPoint(x: 38 * s, y: 4 * s))
-    path.line(to: NSPoint(x: 14 * s, y: 36 * s))
-    path.line(to: NSPoint(x: 28 * s, y: 36 * s))
-    path.line(to: NSPoint(x: 24 * s, y: 60 * s))
-    path.line(to: NSPoint(x: 50 * s, y: 26 * s))
-    path.line(to: NSPoint(x: 34 * s, y: 26 * s))
+    let vertices = points.map { NSPoint(x: center + ($0.0 - 32) * scale, y: center + ($0.1 - 32) * scale) }
+    path.move(to: vertices[0])
+    vertices.dropFirst().forEach { path.line(to: $0) }
     path.close()
     path.lineJoinStyle = .round
     return path
@@ -24,7 +25,7 @@ func export(_ size: Int) {
     NSColor.black.setFill()
     let path = boltPath(in: CGFloat(size))
     path.fill()
-    path.lineWidth = CGFloat(size) / 10.0
+    path.lineWidth = CGFloat(size) / 16.0
     path.stroke()
     image.unlockFocus()
     let rep = NSBitmapImageRep(data: image.tiffRepresentation!)!
