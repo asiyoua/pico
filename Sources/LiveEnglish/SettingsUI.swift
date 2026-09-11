@@ -513,14 +513,16 @@ struct SettingsView: View {
             }
         }
 
+        // Morandi palette: muted, gray-leaning tones that stay quiet next to
+        // the app's content-first design.
         var tint: Color {
             switch self {
-            case .general: return .gray
-            case .translation: return .blue
-            case .overlay: return .purple
-            case .history: return .orange
-            case .privacy: return .red
-            case .about: return .green
+            case .general: return Color(red: 0.55, green: 0.53, blue: 0.50)
+            case .translation: return Color(red: 0.48, green: 0.55, blue: 0.61)
+            case .overlay: return Color(red: 0.57, green: 0.52, blue: 0.63)
+            case .history: return Color(red: 0.65, green: 0.59, blue: 0.50)
+            case .privacy: return Color(red: 0.63, green: 0.51, blue: 0.53)
+            case .about: return Color(red: 0.55, green: 0.62, blue: 0.56)
             }
         }
 
@@ -593,7 +595,7 @@ struct SettingsView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 24, height: 24)
-                    .background(page.tint.opacity(0.85), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .background(page.tint.opacity(0.9), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Text(page.title(lang))
                     .font(.system(size: 13))
                     .foregroundStyle(selected ? .primary : .secondary)
