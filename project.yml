@@ -1,4 +1,4 @@
-name: FloatTrans
+name: Pico
 options:
   bundleIdPrefix: cc.kristar
   deploymentTarget:
@@ -15,21 +15,21 @@ configs:
   Debug: debug
   Release: release
 targets:
-  FloatTrans:
+  Pico:
     type: application
     platform: macOS
     deploymentTarget: "15.0"
     sources:
-      - path: Sources/LiveEnglish
+      - path: Sources/Pico
       - path: Resources/Assets.xcassets
         buildPhase: resources
     settings:
       base:
-        PRODUCT_NAME: FloatTrans
+        PRODUCT_NAME: Pico
         PRODUCT_BUNDLE_IDENTIFIER: cc.kristar.floattrans
         INFOPLIST_FILE: Resources/Info.plist
-        CODE_SIGN_ENTITLEMENTS: Resources/LiveEnglish.entitlements
-        PRODUCT_MODULE_NAME: LiveEnglish
+        CODE_SIGN_ENTITLEMENTS: Resources/Pico.entitlements
+        PRODUCT_MODULE_NAME: Pico
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_CFBundleDisplayName: Pico
         INFOPLIST_KEY_CFBundleName: Pico
@@ -42,17 +42,17 @@ targets:
           SWIFT_OPTIMIZATION_LEVEL: "-O"
     scheme:
       testTargets:
-        - LiveEnglishTests
+        - PicoTests
       gatherCoverageData: false
-  LiveEnglishTests:
+  PicoTests:
     type: bundle.unit-test
     platform: macOS
     deploymentTarget: "15.0"
     sources:
-      - path: Tests/LiveEnglishTests
+      - path: Tests/PicoTests
     dependencies:
-      - target: FloatTrans
+      - target: Pico
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.liveenglish.tests
+        PRODUCT_BUNDLE_IDENTIFIER: app.pico.tests
         GENERATE_INFOPLIST_FILE: YES
