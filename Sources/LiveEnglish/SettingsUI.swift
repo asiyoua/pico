@@ -515,14 +515,15 @@ struct SettingsView: View {
 
         // Morandi palette: muted but colorful — dusty blue, sage, mauve,
         // mustard, dusty rose and terracotta.
-        var tint: Color {
+        // Chip gradient in the style of macOS System Settings icons.
+        var chipColors: [Color] {
             switch self {
-            case .general: return Color(red: 0.49, green: 0.60, blue: 0.69)
-            case .translation: return Color(red: 0.53, green: 0.66, blue: 0.58)
-            case .overlay: return Color(red: 0.62, green: 0.56, blue: 0.69)
-            case .history: return Color(red: 0.77, green: 0.66, blue: 0.47)
-            case .privacy: return Color(red: 0.74, green: 0.56, blue: 0.56)
-            case .about: return Color(red: 0.76, green: 0.55, blue: 0.42)
+            case .general: return [Color(red: 0.64, green: 0.66, blue: 0.69), Color(red: 0.42, green: 0.45, blue: 0.49)]
+            case .translation: return [Color(red: 0.36, green: 0.66, blue: 0.96), Color(red: 0.12, green: 0.44, blue: 0.89)]
+            case .overlay: return [Color(red: 0.67, green: 0.56, blue: 0.95), Color(red: 0.45, green: 0.31, blue: 0.81)]
+            case .history: return [Color(red: 0.97, green: 0.70, blue: 0.30), Color(red: 0.89, green: 0.52, blue: 0.11)]
+            case .privacy: return [Color(red: 0.96, green: 0.45, blue: 0.48), Color(red: 0.85, green: 0.26, blue: 0.30)]
+            case .about: return [Color(red: 0.39, green: 0.78, blue: 0.47), Color(red: 0.18, green: 0.62, blue: 0.32)]
             }
         }
 
@@ -587,6 +588,9 @@ struct SettingsView: View {
 
     private func sidebarButton(_ page: Page) -> some View {
         let selected = selectedPage == page
+        let chip = LinearGradient(
+            colors: page.chipColors,
+            startPoint: .topLeading, endPoint: .bottomTrailing)
         return Button {
             selectedPage = page
         } label: {
@@ -595,17 +599,17 @@ struct SettingsView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 24, height: 24)
-                    .background(page.tint, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .background(chip, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Text(page.title(lang))
-                    .font(.system(size: 13))
-                    .foregroundStyle(selected ? .primary : .secondary)
+                    .font(.system(size: 13, weight: selected ? .medium : .regular))
                 Spacer()
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(
-                selected ? Color.primary.opacity(0.09) : Color.clear,
-                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                selected ? Color.accentColor : Color.clear,
+                in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .foregroundStyle(selected ? .white : .primary)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
