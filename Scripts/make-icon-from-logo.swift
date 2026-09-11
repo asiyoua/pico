@@ -1,8 +1,8 @@
-// Builds the app icon set from the 3D "P" logo artwork (pico-logo.png).
+// Builds the app icon from the 3D "P" logo artwork (pico-logo.png).
 // Run: swift Scripts/make-icon-from-logo.swift [path-to-logo.png]
-// The logo is cover-filled into a macOS squircle so the Dock shows a proper
-// rounded shape; a hairline edge keeps the cream square visible on light
-// backgrounds.
+// Renders the 1024px master (logo cover-filled into a macOS squircle), writes
+// an .iconset with every required size, then converts it to AppIcon.icns.
+// The icns is committed to Resources/ and build-app.sh copies it into the app.
 
 import AppKit
 
@@ -11,6 +11,7 @@ let contentRect = NSRect(x: 100, y: 100, width: 824, height: 824)
 let cornerRadius: CGFloat = 186
 let logoPath = CommandLine.arguments.count > 1
     ? CommandLine.arguments[1] : "pico-logo.png"
+let iconsetDir = "/tmp/AppIcon.iconset"
 
 guard let logo = NSImage(contentsOfFile: logoPath) else {
     fatalError("logo not found at \(logoPath)")
@@ -20,32 +21,23 @@ let image = NSImage(size: NSSize(width: masterSize, height: masterSize))
 image.lockFocusFlipped(false)
 guard let context = NSGraphicsContext.current?.cgContext else { fatalError() }
 
-context.clear(NSRect(x: 0, y: 0, width: masterSize, height: masterSize))
-let squircle = NSBezierPath(roundedRect: contentRect, xRadius: cornerRadius, yRadius: cornerRadius)
-context.saveGState()
-squircle.addClip()
-// Cover-fill the squircle with the logo artwork (square source, square target).
+// macOS 26 masks full-bleed square art into the system squircle itself, so
+// the icon canvas is filled edge to edge — no transparent margins.
+let fullRect = NSRect(x: 0, y: 0, width: masterSize, height: masterSize)
 logo.draw(
-    in: contentRect,
+    in: fullRect,
     from: .zero,
     operation: .sourceOver,
     fraction: 1,
     respectFlipped: false,
     hints: [.interpolation: NSImageInterpolation.high.rawValue])
-context.restoreGState()
-
-// Hairline edge so the cream square keeps definition on light backgrounds.
-let edge = NSBezierPath(roundedRect: contentRect.insetBy(dx: 3, dy: 3), xRadius: cornerRadius - 3, yRadius: cornerRadius - 3)
-NSColor(white: 0, alpha: 0.08).setStroke()
-edge.lineWidth = 5
-edge.stroke()
 
 image.unlockFocus()
 
 let masterRep = NSBitmapImageRep(data: image.tiffRepresentation!)!
 let cg = masterRep.cgImage!
 
-func export(_ size: CGFloat, _ file: String) {
+func renderPNG(_ size: CGFloat) -> Data {
     let out = NSImage(size: NSSize(width: size, height: size))
     out.lockFocus()
     NSGraphicsContext.current?.imageInterpolation = .high
@@ -53,14 +45,21 @@ func export(_ size: CGFloat, _ file: String) {
     out.unlockFocus()
     let rep = NSBitmapImageRep(data: out.tiffRepresentation!)!
     guard let png = rep.representation(using: .png, properties: [:]) else { fatalError("png encode") }
-    let url = URL(fileURLWithPath: "Resources/Assets.xcassets/AppIcon.appiconset/\(file)")
-    try! png.write(to: url)
-    print("wrote \(file)")
+    return png
 }
 
-export(1024, "AppIcon-1024.png")
-export(512, "AppIcon-512.png")
-export(256, "AppIcon-256.png")
-export(128, "AppIcon-128.png")
-export(32, "AppIcon-32.png")
-export(16, "AppIcon-16.png")
+let fileManager = FileManager.default
+try? fileManager.removeItem(atPath: iconsetDir)
+try! fileManager.createDirectory(atPath: iconsetDir, withIntermediateDirectories: true)
+
+let sizes: [(String, CGFloat)] = [
+    ("icon_16x16.png", 16), ("icon_16x16@2x.png", 32),
+    ("icon_32x32.png", 32), ("icon_32x32@2x.png", 64),
+    ("icon_128x128.png", 128), ("icon_128x128@2x.png", 256),
+    ("icon_256x256.png", 256), ("icon_256x256@2x.png", 512),
+    ("icon_512x512.png", 512), ("icon_512x512@2x.png", 1024),
+]
+for (name, size) in sizes {
+    try! renderPNG(size).write(to: URL(fileURLWithPath: "\(iconsetDir)/\(name)"))
+    print("wrote \(name)")
+}

@@ -10,24 +10,17 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/FloatTrans" "$APP/Contents/MacOS/FloatTrans"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 
-# Compile AppIcon + MenuBarIcon asset catalog into the packaged app bundle.
-# Merge actool's icon keys; without them Finder shows a generic blank app icon.
-PARTIAL_PLIST="$(mktemp)"
+# App icon ships as a classic .icns (CFBundleIconFile=AppIcon in Info.plist).
+# actool silently drops the AppIcon asset set on this project, so the icon is
+# committed as Resources/AppIcon.icns instead of living in the catalog.
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+
+# Compile the remaining asset catalog images (menu bar / history icons).
 xcrun actool \
-  --output-partial-info-plist "$PARTIAL_PLIST" \
-  --app-icon AppIcon \
   --platform macosx \
   --minimum-deployment-target 15.0 \
   --compile "$APP/Contents/Resources" \
   Resources/Assets.xcassets
-if [[ -s "$PARTIAL_PLIST" ]]; then
-  for key in CFBundleIconFile CFBundleIconName; do
-    val="$(/usr/libexec/PlistBuddy -c "Print :$key" "$PARTIAL_PLIST" 2>/dev/null)" || continue
-    /usr/libexec/PlistBuddy -c "Delete :$key" "$APP/Contents/Info.plist" 2>/dev/null || true
-    /usr/libexec/PlistBuddy -c "Add :$key string $val" "$APP/Contents/Info.plist"
-  done
-fi
-rm -f "$PARTIAL_PLIST"
 
 ENTITLEMENTS="$ROOT/Resources/LiveEnglish.entitlements"
 # Prefer the stable self-signed identity ("FloatTrans Dev") so the macOS
