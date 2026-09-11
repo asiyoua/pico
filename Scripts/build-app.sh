@@ -4,10 +4,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 swift build -c release
 BIN_DIR="$(swift build -c release --show-bin-path)"
-APP="$ROOT/FloatTrans.app"
+APP="$ROOT/Pico.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN_DIR/FloatTrans" "$APP/Contents/MacOS/FloatTrans"
+cp "$BIN_DIR/Pico" "$APP/Contents/MacOS/Pico"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 
 # App icon ships as a classic .icns (CFBundleIconFile=AppIcon in Info.plist).
@@ -22,7 +22,7 @@ xcrun actool \
   --compile "$APP/Contents/Resources" \
   Resources/Assets.xcassets
 
-ENTITLEMENTS="$ROOT/Resources/LiveEnglish.entitlements"
+ENTITLEMENTS="$ROOT/Resources/Pico.entitlements"
 # Prefer the stable self-signed identity ("FloatTrans Dev") so the macOS
 # accessibility grant survives reinstalls; fall back to ad-hoc. An explicit
 # CODESIGN_IDENTITY always wins.

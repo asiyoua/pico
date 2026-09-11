@@ -33,7 +33,7 @@ enum L10n {
     // MARK: - Settings chrome
 
     static func settingsWindowTitle(_ lang: UILanguage) -> String {
-        lang == .chinese ? "Pico 设置" : "FloatTrans Settings"
+        lang == .chinese ? "Pico 设置" : "Pico Settings"
     }
     static func tabGeneral(_ lang: UILanguage) -> String {
         lang == .chinese ? "通用" : "General"
@@ -194,7 +194,7 @@ enum L10n {
     static func historyExportMarkdown(_ lang: UILanguage) -> String { lang == .chinese ? "导出 Markdown" : "Export Markdown" }
     static func historyExportExcel(_ lang: UILanguage) -> String { lang == .chinese ? "导出 Excel" : "Export Excel" }
     static func historyExportTitle(_ lang: UILanguage) -> String {
-        lang == .chinese ? "Pico 历史记录" : "FloatTrans Translation History"
+        lang == .chinese ? "Pico 历史记录" : "Pico Translation History"
     }
     static func historyEmpty(_ lang: UILanguage) -> String {
         lang == .chinese ? "暂时没有已完成的翻译记录。" : "No completed translations yet."
@@ -382,7 +382,7 @@ enum L10n {
     static func privacyExplanation(_ lang: UILanguage) -> String {
         lang == .chinese
             ? "Pico 不会读取或翻译以下应用内的文本。"
-            : "FloatTrans will not read or translate text inside these apps."
+            : "Pico will not read or translate text inside these apps."
     }
     static func addApplication(_ lang: UILanguage) -> String {
         lang == .chinese ? "＋ 添加应用…" : "+ Add Application…"

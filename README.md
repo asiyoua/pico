@@ -69,7 +69,7 @@ zsh Scripts/build-app.sh
 open FloatTrans.app
 ```
 
-磁盘上的应用包和可执行文件名为 `FloatTrans`；用户看到的显示名是「Pico」。打包 DMG：
+应用包、可执行文件与显示名统一为 Pico（Bundle ID 保留 `cc.kristar.floattrans`，老用户设置与授权无缝延续）。打包 DMG：
 
 ```sh
 zsh Scripts/build-dmg.sh
@@ -93,7 +93,7 @@ swift Scripts/make-menubar-icon.swift                   # 菜单栏闪电模板�
 ## 项目结构
 
 ```text
-Sources/LiveEnglish/
+Sources/Pico/
 ├── App.swift            应用入口、菜单栏、设置/欢迎窗口、关于页、剪贴板管线
 ├── SettingsUI.swift     设置窗口（侧边栏导航 + 卡片分组）
 ├── HotKey.swift         替换 / 复制 / 翻译 / 剪贴板快捷键

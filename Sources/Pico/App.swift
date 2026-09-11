@@ -4,14 +4,14 @@ import OSLog
 import SwiftUI
 @preconcurrency import Translation
 
-@main struct LiveEnglishApp: App {
+@main struct PicoApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     var body: some Scene {
         MenuBarExtra("Pico", image: "MenuBarIcon") {
             MenuBarMenu(state: appDelegate.state)
         }.menuBarExtraStyle(.menu)
         Settings { SettingsView(state: appDelegate.state) }
-        Window("Welcome to FloatTrans", id: "welcome") { WelcomeView(state: appDelegate.state) }.defaultSize(
+        Window("Welcome to Pico", id: "welcome") { WelcomeView(state: appDelegate.state) }.defaultSize(
             width: 520, height: 360)
     }
 }
@@ -69,7 +69,7 @@ struct MenuBarMenu: View {
 }
 
 @MainActor final class AppState: ObservableObject {
-    private let logger = Logger(subsystem: "com.liveenglish.app", category: "runtime")
+    private let logger = Logger(subsystem: "app.pico", category: "runtime")
     @Published var enabled: Bool
     @Published var translation = ""
     @Published var permissionGranted: Bool
@@ -119,7 +119,7 @@ struct MenuBarMenu: View {
             engine: service, sourceLanguage: store.sourceLanguage, targetLanguage: store.targetLanguage)
         history = historyController
         speech = SpeechService()
-        NSLog("LiveEnglish startup trusted=%@ enabled=%@", String(trustedValue), String(enabledValue))
+        NSLog("Pico startup trusted=%@ enabled=%@", String(trustedValue), String(enabledValue))
         DiagnosticLog.write("startup trusted=\(trustedValue) enabled=\(enabledValue)")
         logger.info("startup trusted=\(trustedValue, privacy: .public) enabled=\(enabledValue, privacy: .public)")
         input.isEnabled = enabled
@@ -293,7 +293,7 @@ struct MenuBarMenu: View {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 360), styleMask: [.titled, .closable],
             backing: .buffered, defer: false)
-        window.title = "Welcome to FloatTrans"
+        window.title = "Welcome to Pico"
         window.contentView = NSHostingView(rootView: WelcomeView(state: self))
         window.center()
         window.isReleasedWhenClosed = false
@@ -649,7 +649,7 @@ struct WelcomeView: View {
                 step == 0
                         ? "Live English translates what you're typing without interrupting your workflow."
                         : step == 1
-                            ? "Permission lets FloatTrans read only the editable text field. Password fields are always skipped."
+                            ? "Permission lets Pico read only the editable text field. Password fields are always skipped."
                             : "Type something in Chinese in any supported text field."
             ).multilineTextAlignment(.center).foregroundStyle(.secondary)
             if step == 1 && !state.permissionGranted {

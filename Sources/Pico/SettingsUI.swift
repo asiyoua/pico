@@ -1190,7 +1190,7 @@ struct SettingsView: View {
 
     private func exportHistory(_ format: HistoryExportFormat) {
         let panel = NSSavePanel()
-        panel.nameFieldStringValue = "FloatTrans-history.\(format.fileExtension)"
+        panel.nameFieldStringValue = "Pico-history.\(format.fileExtension)"
         panel.allowedContentTypes = [UTType(filenameExtension: format.fileExtension) ?? .data]
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }

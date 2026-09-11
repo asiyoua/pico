@@ -10,22 +10,22 @@ fi
 
 zsh "$ROOT/Scripts/build-app.sh"
 
-APP="$ROOT/FloatTrans.app"
+APP="$ROOT/Pico.app"
 STAGE="$ROOT/dist/dmg-stage"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/FloatTrans.app"
+cp -R "$APP" "$STAGE/Pico.app"
 
 VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-DMG="$ROOT/dist/FloatTrans-${VERSION}.dmg"
+DMG="$ROOT/dist/Pico-${VERSION}.dmg"
 
 create-dmg \
-  --volname "FloatTrans" \
+  --volname "Pico" \
   --volicon "$APP/Contents/Resources/AppIcon.icns" \
   --window-size 600 400 \
   --icon-size 100 \
-  --icon "FloatTrans.app" 150 200 \
-  --hide-extension "FloatTrans.app" \
+  --icon "Pico.app" 150 200 \
+  --hide-extension "Pico.app" \
   --app-drop-link 450 200 \
   --overwrite \
   "$DMG" \

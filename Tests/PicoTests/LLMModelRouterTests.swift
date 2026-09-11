@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 
-@testable import LiveEnglish
+@testable import Pico
 
 final class LLMModelRouterTests: XCTestCase {
     override func setUp() {

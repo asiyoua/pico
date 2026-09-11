@@ -30,7 +30,7 @@ public struct InputSessionID: Hashable, Sendable {
 }
 
 @MainActor final class InputCoordinator {
-    private let logger = Logger(subsystem: "com.liveenglish.app", category: "pipeline")
+    private let logger = Logger(subsystem: "app.pico", category: "pipeline")
     private let extractor = SentenceExtractor(), detector = LanguageTextDetector(), debouncer = InputDebouncer()
     private var lastSentence = "", session: InputSessionID?
     var isEnabled = true
@@ -122,7 +122,7 @@ public struct InputSessionID: Hashable, Sendable {
 }
 
 @MainActor final class AccessibilityMonitor {
-    private let logger = Logger(subsystem: "com.liveenglish.app", category: "accessibility")
+    private let logger = Logger(subsystem: "app.pico", category: "accessibility")
     var onSnapshot: ((TextSnapshot, InputSessionID, NSScreen?) -> Void)?
     var excludedBundleIDs: Set<String> = []
     var sourceLanguage: Language = .chinese
@@ -138,14 +138,14 @@ public struct InputSessionID: Hashable, Sendable {
     func start() {
         guard AXIsProcessTrusted() else {
             DiagnosticLog.write("AX trust check failed")
-            NSLog("LiveEnglish AX trust check failed")
+            NSLog("Pico AX trust check failed")
             logger.error("AX trust check failed")
             return
         }
         guard !isRunning else { return }
         isRunning = true
         DiagnosticLog.write("monitor starting")
-        NSLog("LiveEnglish monitor starting")
+        NSLog("Pico monitor starting")
         logger.info("monitor starting")
         appObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main

@@ -53,7 +53,7 @@
 		7E678408C613A958D6756726 /* LLMModelRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMModelRouterTests.swift; sourceTree = "<group>"; };
 		8A482431763CD170A77874E2 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		90B64F70BF7540A7F1698802 /* TranslationHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationHistory.swift; sourceTree = "<group>"; };
-		9CAF077D0D361E6FA06BA629 /* LiveEnglishTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LiveEnglishTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		9CAF077D0D361E6FA06BA629 /* PicoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PicoTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ACCE1FC53454B7A80B09FD70 /* SettingsUI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsUI.swift; sourceTree = "<group>"; };
 		B1A3EE8953743775602C1775 /* SettingsStoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsStoreTests.swift; sourceTree = "<group>"; };
 		B79DC6D52D2D05F71DF31C44 /* L10n.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = L10n.swift; sourceTree = "<group>"; };
@@ -82,12 +82,12 @@
 		16E31E550D08C12BFFAA8367 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
-				2A38E34626CB6C4D99304F5E /* LiveEnglishTests */,
+				2A38E34626CB6C4D99304F5E /* PicoTests */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
 		};
-		192EBBB13D8DF7EE36383D01 /* LiveEnglish */ = {
+		192EBBB13D8DF7EE36383D01 /* Pico */ = {
 			isa = PBXGroup;
 			children = (
 				62A46770F851F38B730D1893 /* App.swift */,
@@ -105,10 +105,10 @@
 				90B64F70BF7540A7F1698802 /* TranslationHistory.swift */,
 				482E5D547234F1D29A4F1242 /* UpdateChecker.swift */,
 			);
-			path = LiveEnglish;
+			path = Pico;
 			sourceTree = "<group>";
 		};
-		2A38E34626CB6C4D99304F5E /* LiveEnglishTests */ = {
+		2A38E34626CB6C4D99304F5E /* PicoTests */ = {
 			isa = PBXGroup;
 			children = (
 				DD9608C511A06166038E44C5 /* InputCoordinatorTimingTests.swift */,
@@ -118,7 +118,7 @@
 				74B9F189A992455A7ABF6373 /* TranslationHistoryTests.swift */,
 				5AF7E5AE72B0F9EE88C40946 /* UpdateCheckerTests.swift */,
 			);
-			path = LiveEnglishTests;
+			path = PicoTests;
 			sourceTree = "<group>";
 		};
 		2F1DEEAA93E5AE593E69805E /* Resources */ = {
@@ -132,7 +132,7 @@
 		4C7CCFB5184E8209EE2D7835 /* Sources */ = {
 			isa = PBXGroup;
 			children = (
-				192EBBB13D8DF7EE36383D01 /* LiveEnglish */,
+				192EBBB13D8DF7EE36383D01 /* Pico */,
 			);
 			path = Sources;
 			sourceTree = "<group>";
@@ -141,7 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				6F26C9DCE3655C5F85C876F9 /* FloatTrans.app */,
-				9CAF077D0D361E6FA06BA629 /* LiveEnglishTests.xctest */,
+				9CAF077D0D361E6FA06BA629 /* PicoTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -167,9 +167,9 @@
 			productReference = 6F26C9DCE3655C5F85C876F9 /* FloatTrans.app */;
 			productType = "com.apple.product-type.application";
 		};
-		E5CEF6D1B86D60E550BA10ED /* LiveEnglishTests */ = {
+		E5CEF6D1B86D60E550BA10ED /* PicoTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = B6A0304E556B30BEBB607415 /* Build configuration list for PBXNativeTarget "LiveEnglishTests" */;
+			buildConfigurationList = B6A0304E556B30BEBB607415 /* Build configuration list for PBXNativeTarget "PicoTests" */;
 			buildPhases = (
 				D646D1FEF0BD1D54A76FC1E0 /* Sources */,
 			);
@@ -178,11 +178,11 @@
 			dependencies = (
 				8C428158667023C322C40970 /* PBXTargetDependency */,
 			);
-			name = LiveEnglishTests;
+			name = PicoTests;
 			packageProductDependencies = (
 			);
-			productName = LiveEnglishTests;
-			productReference = 9CAF077D0D361E6FA06BA629 /* LiveEnglishTests.xctest */;
+			productName = PicoTests;
+			productReference = 9CAF077D0D361E6FA06BA629 /* PicoTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
@@ -214,7 +214,7 @@
 			projectRoot = "";
 			targets = (
 				A9245971E021FF3119F4B652 /* FloatTrans */,
-				E5CEF6D1B86D60E550BA10ED /* LiveEnglishTests */,
+				E5CEF6D1B86D60E550BA10ED /* PicoTests */,
 			);
 		};
 /* End PBXProject section */
@@ -355,7 +355,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Resources/LiveEnglish.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Resources/Pico.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -367,7 +367,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.kristar.floattrans;
-				PRODUCT_MODULE_NAME = LiveEnglish;
+				PRODUCT_MODULE_NAME = Pico;
 				PRODUCT_NAME = FloatTrans;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -461,7 +461,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = Resources/LiveEnglish.entitlements;
+				CODE_SIGN_ENTITLEMENTS = Resources/Pico.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
@@ -473,7 +473,7 @@
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.kristar.floattrans;
-				PRODUCT_MODULE_NAME = LiveEnglish;
+				PRODUCT_MODULE_NAME = Pico;
 				PRODUCT_NAME = FloatTrans;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -502,7 +502,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		B6A0304E556B30BEBB607415 /* Build configuration list for PBXNativeTarget "LiveEnglishTests" */ = {
+		B6A0304E556B30BEBB607415 /* Build configuration list for PBXNativeTarget "PicoTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				B19D51B01009D318E6E502E9 /* Debug */,

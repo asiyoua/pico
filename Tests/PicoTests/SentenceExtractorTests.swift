@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import LiveEnglish
+@testable import Pico
 
 final class SentenceExtractorTests: XCTestCase {
     func testExtractsSentenceAtCursor() {

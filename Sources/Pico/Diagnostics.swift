@@ -7,7 +7,7 @@ import Foundation
 /// build from growing an unbounded log file for every poll tick. The file is
 /// truncated once it exceeds ``maxBytes`` so long sessions stay bounded.
 enum DiagnosticLog {
-    private static let url = URL(fileURLWithPath: "/tmp/liveenglish-debug.log")
+    private static let url = URL(fileURLWithPath: "/tmp/pico-debug.log")
     private static let maxBytes = 1_048_576
     /// Fractional seconds keep the stage-by-stage latency measurable.
     /// ISO8601DateFormatter is thread-safe for formatting; the unsafe marker

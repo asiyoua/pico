@@ -2,13 +2,13 @@
 import PackageDescription
 
 let package = Package(
-    name: "LiveEnglish",
+    name: "Pico",
     platforms: [.macOS(.v15)],
-    products: [.executable(name: "FloatTrans", targets: ["LiveEnglish"])],
+    products: [.executable(name: "Pico", targets: ["Pico"])],
     targets: [
         .executableTarget(
-            name: "LiveEnglish", path: "Sources/LiveEnglish",
+            name: "Pico", path: "Sources/Pico",
             swiftSettings: [.unsafeFlags(["-Xfrontend", "-strict-concurrency=minimal"])]),
-        .testTarget(name: "LiveEnglishTests", dependencies: ["LiveEnglish"], path: "Tests/LiveEnglishTests"),
+        .testTarget(name: "PicoTests", dependencies: ["Pico"], path: "Tests/PicoTests"),
     ]
 )

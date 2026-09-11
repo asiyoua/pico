@@ -1,6 +1,6 @@
 import Foundation
 import XCTest
-@testable import LiveEnglish
+@testable import Pico
 
 final class TranslationHistoryTests: XCTestCase {
     func testRetentionPrunesExpiredRowsWhenRecording() async throws {
