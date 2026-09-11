@@ -44,7 +44,7 @@
 ### 全新品牌：拟人小助手 Pico
 
 - 应用更名为 **Pico**（中文昵称「皮可」）——取自物理词头 pico-（10⁻¹²）：**又小又快**，正是这只 133 毫秒出译文的小跟班
-- 全新吉祥物图标：气泡小脸 + 天线 + 腮红（由 `Scripts/make-icon.swift` 纯代码绘制）
+- 全新品牌 Logo：3D 蓝色「P」字（Pico 的 P），源文件 `pico-logo.png`，应用图标由 `Scripts/make-icon-from-logo.swift` 生成
 - 应用标识与数据位置不变，老用户无缝升级
 
 ### 稳定性修复
