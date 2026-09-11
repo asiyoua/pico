@@ -16,9 +16,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A9245971E021FF3119F4B652"
-               BuildableName = "FloatTrans.app"
-               BlueprintName = "FloatTrans"
-               ReferencedContainer = "container:FloatTrans.xcodeproj">
+               BuildableName = "Pico.app"
+               BlueprintName = "Pico"
+               ReferencedContainer = "container:Pico.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -33,9 +33,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A9245971E021FF3119F4B652"
-            BuildableName = "FloatTrans.app"
-            BlueprintName = "FloatTrans"
-            ReferencedContainer = "container:FloatTrans.xcodeproj">
+            BuildableName = "Pico.app"
+            BlueprintName = "Pico"
+            ReferencedContainer = "container:Pico.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -47,7 +47,7 @@
                BlueprintIdentifier = "E5CEF6D1B86D60E550BA10ED"
                BuildableName = "LiveEnglishTests.xctest"
                BlueprintName = "LiveEnglishTests"
-               ReferencedContainer = "container:FloatTrans.xcodeproj">
+               ReferencedContainer = "container:Pico.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -69,9 +69,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A9245971E021FF3119F4B652"
-            BuildableName = "FloatTrans.app"
-            BlueprintName = "FloatTrans"
-            ReferencedContainer = "container:FloatTrans.xcodeproj">
+            BuildableName = "Pico.app"
+            BlueprintName = "Pico"
+            ReferencedContainer = "container:Pico.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
@@ -88,9 +88,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A9245971E021FF3119F4B652"
-            BuildableName = "FloatTrans.app"
-            BlueprintName = "FloatTrans"
-            ReferencedContainer = "container:FloatTrans.xcodeproj">
+            BuildableName = "Pico.app"
+            BlueprintName = "Pico"
+            ReferencedContainer = "container:Pico.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>

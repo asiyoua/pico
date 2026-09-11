@@ -36,7 +36,7 @@
 			containerPortal = E0A98B5391C23486A5BC710C /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A9245971E021FF3119F4B652;
-			remoteInfo = FloatTrans;
+			remoteInfo = Pico;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -48,7 +48,7 @@
 		5AF7E5AE72B0F9EE88C40946 /* UpdateCheckerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateCheckerTests.swift; sourceTree = "<group>"; };
 		62A46770F851F38B730D1893 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		69512DAFE0AC04B2E8984150 /* SentenceExtractorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SentenceExtractorTests.swift; sourceTree = "<group>"; };
-		6F26C9DCE3655C5F85C876F9 /* FloatTrans.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FloatTrans.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F26C9DCE3655C5F85C876F9 /* Pico.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Pico.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		74B9F189A992455A7ABF6373 /* TranslationHistoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranslationHistoryTests.swift; sourceTree = "<group>"; };
 		7E678408C613A958D6756726 /* LLMModelRouterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LLMModelRouterTests.swift; sourceTree = "<group>"; };
 		8A482431763CD170A77874E2 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
@@ -140,7 +140,7 @@
 		ACF107885CA22A32C74FA79C /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				6F26C9DCE3655C5F85C876F9 /* FloatTrans.app */,
+				6F26C9DCE3655C5F85C876F9 /* Pico.app */,
 				9CAF077D0D361E6FA06BA629 /* PicoTests.xctest */,
 			);
 			name = Products;
@@ -149,9 +149,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A9245971E021FF3119F4B652 /* FloatTrans */ = {
+		A9245971E021FF3119F4B652 /* Pico */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 6FF54F8A8DD2B0A083CA281F /* Build configuration list for PBXNativeTarget "FloatTrans" */;
+			buildConfigurationList = 6FF54F8A8DD2B0A083CA281F /* Build configuration list for PBXNativeTarget "Pico" */;
 			buildPhases = (
 				6A933C9A71EDA7334F5AA846 /* Sources */,
 				09A657F829E194C274D7D92E /* Resources */,
@@ -160,11 +160,11 @@
 			);
 			dependencies = (
 			);
-			name = FloatTrans;
+			name = Pico;
 			packageProductDependencies = (
 			);
-			productName = FloatTrans;
-			productReference = 6F26C9DCE3655C5F85C876F9 /* FloatTrans.app */;
+			productName = Pico;
+			productReference = 6F26C9DCE3655C5F85C876F9 /* Pico.app */;
 			productType = "com.apple.product-type.application";
 		};
 		E5CEF6D1B86D60E550BA10ED /* PicoTests */ = {
@@ -199,7 +199,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 07F3B14BD178A4739EF7A8CC /* Build configuration list for PBXProject "FloatTrans" */;
+			buildConfigurationList = 07F3B14BD178A4739EF7A8CC /* Build configuration list for PBXProject "Pico" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -213,7 +213,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A9245971E021FF3119F4B652 /* FloatTrans */,
+				A9245971E021FF3119F4B652 /* Pico */,
 				E5CEF6D1B86D60E550BA10ED /* PicoTests */,
 			);
 		};
@@ -270,7 +270,7 @@
 /* Begin PBXTargetDependency section */
 		8C428158667023C322C40970 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A9245971E021FF3119F4B652 /* FloatTrans */;
+			target = A9245971E021FF3119F4B652 /* Pico */;
 			targetProxy = F7698B0EECD8967C1CF7F959 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -347,7 +347,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.liveenglish.tests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FloatTrans.app/Contents/MacOS/FloatTrans";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pico.app/Contents/MacOS/Pico";
 			};
 			name = Release;
 		};
@@ -368,7 +368,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.kristar.floattrans;
 				PRODUCT_MODULE_NAME = Pico;
-				PRODUCT_NAME = FloatTrans;
+				PRODUCT_NAME = Pico;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -453,7 +453,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.liveenglish.tests;
 				SDKROOT = macosx;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FloatTrans.app/Contents/MacOS/FloatTrans";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pico.app/Contents/MacOS/Pico";
 			};
 			name = Debug;
 		};
@@ -474,7 +474,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = cc.kristar.floattrans;
 				PRODUCT_MODULE_NAME = Pico;
-				PRODUCT_NAME = FloatTrans;
+				PRODUCT_NAME = Pico;
 				SDKROOT = macosx;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
@@ -484,7 +484,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		07F3B14BD178A4739EF7A8CC /* Build configuration list for PBXProject "FloatTrans" */ = {
+		07F3B14BD178A4739EF7A8CC /* Build configuration list for PBXProject "Pico" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4F0FA987DF55186BCC82C969 /* Debug */,
@@ -493,7 +493,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
 		};
-		6FF54F8A8DD2B0A083CA281F /* Build configuration list for PBXNativeTarget "FloatTrans" */ = {
+		6FF54F8A8DD2B0A083CA281F /* Build configuration list for PBXNativeTarget "Pico" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				457BDF93AF6DA8FC6B4D2D97 /* Debug */,
