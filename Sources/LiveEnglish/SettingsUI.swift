@@ -513,16 +513,16 @@ struct SettingsView: View {
             }
         }
 
-        // Morandi palette: muted, gray-leaning tones that stay quiet next to
-        // the app's content-first design.
+        // Morandi palette: muted but colorful — dusty blue, sage, mauve,
+        // mustard, dusty rose and terracotta.
         var tint: Color {
             switch self {
-            case .general: return Color(red: 0.55, green: 0.53, blue: 0.50)
-            case .translation: return Color(red: 0.48, green: 0.55, blue: 0.61)
-            case .overlay: return Color(red: 0.57, green: 0.52, blue: 0.63)
-            case .history: return Color(red: 0.65, green: 0.59, blue: 0.50)
-            case .privacy: return Color(red: 0.63, green: 0.51, blue: 0.53)
-            case .about: return Color(red: 0.55, green: 0.62, blue: 0.56)
+            case .general: return Color(red: 0.49, green: 0.60, blue: 0.69)
+            case .translation: return Color(red: 0.53, green: 0.66, blue: 0.58)
+            case .overlay: return Color(red: 0.62, green: 0.56, blue: 0.69)
+            case .history: return Color(red: 0.77, green: 0.66, blue: 0.47)
+            case .privacy: return Color(red: 0.74, green: 0.56, blue: 0.56)
+            case .about: return Color(red: 0.76, green: 0.55, blue: 0.42)
             }
         }
 
@@ -595,7 +595,7 @@ struct SettingsView: View {
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(width: 24, height: 24)
-                    .background(page.tint.opacity(0.9), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .background(page.tint, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
                 Text(page.title(lang))
                     .font(.system(size: 13))
                     .foregroundStyle(selected ? .primary : .secondary)
