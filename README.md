@@ -2,7 +2,8 @@
 
 [下载最新版](https://github.com/asiyoua/pico/releases) · 问题反馈：[Issues](https://github.com/asiyoua/pico/issues)
 
-Pico（皮可）是一只住在你菜单栏里的 macOS 实时翻译小助手：在支持无障碍（Accessibility）的文本输入框中打字，译文以低打扰浮窗实时浮现；微信这类不暴露无障碍接口的应用，复制一下按 ⌥⇧V 也能翻译。名字取自物理词头 pico-（10⁻¹²）——又小又快。
+Pico（皮可）是一只住在你菜单栏里的 macOS 实时翻译小助手：在支持无障碍（Accessibility）的文本输入框中打字，译文以低打扰浮窗实时浮现；微信这类不暴露无障碍接口的应用，复制一下按 ⌥⇧V 也能翻译。
+名字取自物理词头 pico-（10⁻¹²）——又小又快。
 
 ## 功能亮点
 
