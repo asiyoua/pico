@@ -27,8 +27,8 @@ ENTITLEMENTS="$ROOT/Resources/Pico.entitlements"
 # accessibility grant survives reinstalls; fall back to ad-hoc. An explicit
 # CODESIGN_IDENTITY always wins.
 IDENTITY="${CODESIGN_IDENTITY:-}"
-if [[ -z "$IDENTITY" ]] && security find-identity -p codesigning -v 2>/dev/null | grep -q '"FloatTrans Dev"'; then
-  IDENTITY="FloatTrans Dev"
+if [[ -z "$IDENTITY" ]] && security find-identity -p codesigning -v 2>/dev/null | grep -qE '"(FloatTrans|Pico) Dev"'; then
+  IDENTITY="$(security find-identity -p codesigning -v 2>/dev/null | grep -oE '"(FloatTrans|Pico) Dev"' | head -1 | tr -d '"')"
 fi
 if [[ -n "$IDENTITY" ]]; then
   # --timestamp contacts Apple's timestamp server, which is unreachable from
