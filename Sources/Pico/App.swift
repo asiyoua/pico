@@ -71,6 +71,8 @@ struct MenuBarMenu: View {
 @MainActor final class AppState: ObservableObject {
     private let logger = Logger(subsystem: "app.pico", category: "runtime")
     @Published var enabled: Bool
+    private var menuBarWatchdog: Timer?
+    private var menuBarHealAttempts = 0
     @Published var translation = ""
     @Published var permissionGranted: Bool
     @Published var showWelcome: Bool
@@ -86,6 +88,7 @@ struct MenuBarMenu: View {
     let overlay = OverlayCoordinator()
     let speech: SpeechPerforming
     let pasteboardWatcher = PasteboardWatcher()
+    let autoUpdater: AutoUpdateController
     private let speechPolicy = SpeechPolicyEvaluator()
     private let hotKey = GlobalHotKey.shared
     private var currentSession: InputSessionID?
@@ -109,6 +112,7 @@ struct MenuBarMenu: View {
             timeoutSeconds: store.llmFallbackTimeout)
         let historyController = TranslationHistoryController()
         settings = store
+        autoUpdater = AutoUpdateController(settings: store)
         enabled = enabledValue
         permissionGranted = trustedValue
         showWelcome = welcomeValue
@@ -144,6 +148,7 @@ struct MenuBarMenu: View {
         monitor.sourceLanguage = settings.sourceLanguage
         settings.onTranslationSettingsChanged = { [weak self] in self?.applyTranslationSettings() }
         settings.onClipboardSettingsChanged = { [weak self] in self?.applyClipboardSettings() }
+        settings.onAutoUpdateChanged = { [weak self] in self?.autoUpdater.startMonitoring() }
         overlay.onCopyToPasteboard = { [weak self] _ in self?.pasteboardWatcher.resyncBaseline() }
         pasteboardWatcher.onCopy = { [weak self] text in self?.translateCopiedText(text, autoTriggered: true) }
         settings.onHistoryRetentionChanged = { [weak self] in
@@ -189,6 +194,7 @@ struct MenuBarMenu: View {
         refreshHotKeys()
         applyTranslationSettings()
         applyClipboardSettings()
+        autoUpdater.startMonitoring()
         history.reload(retention: settings.historyRetention)
         DiagnosticLog.write("init showWelcome=\(showWelcome) onboarded=\(UserDefaults.standard.bool(forKey: "onboardingComplete"))")
         if showWelcome {
@@ -202,6 +208,38 @@ struct MenuBarMenu: View {
     func startTranslationHost() {
         guard translationHostWindow == nil else { return }
         translationHostWindow = TranslationHostWindowController(holder: translationHolder, settings: settings)
+        startMenuBarWatchdog()
+    }
+
+    /// 系统在菜单栏拥挤或创建时机不巧时，会把状态项停到屏幕外（负坐标）。
+    /// 看门狗检测到后移除并重建状态项，让系统重新分配一个可见位置。
+    func startMenuBarWatchdog() {
+        menuBarWatchdog?.invalidate()
+        menuBarWatchdog = Timer.scheduledTimer(withTimeInterval: 8, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.healMenuBarExtraIfNeeded() }
+        }
+    }
+
+    private func healMenuBarExtraIfNeeded() {
+        guard enabled else { return }
+        guard let screen = NSScreen.main else { return }
+        // 菜单栏条带：屏幕顶部 24pt
+        let barFrame = NSRect(x: 0, y: screen.frame.maxY - 24, width: screen.frame.width, height: 24)
+        let statusWindows = NSApp.windows.filter { $0.level == .statusBar }
+        guard !statusWindows.isEmpty else { return }
+        let misplaced = statusWindows.contains { !barFrame.intersects($0.frame) }
+        if misplaced {
+            // 把状态项放回条带内、时钟左侧
+            var x = screen.frame.maxX - 24 - 8
+            for window in statusWindows.reversed() {
+                let w = window.frame.width
+                window.setFrame(NSRect(x: x - w, y: barFrame.minY, width: w, height: 24), display: true)
+                x -= w + 8
+            }
+            menuBarHealAttempts += 1
+        } else {
+            menuBarHealAttempts = 0
+        }
     }
 
     /// Applies a settings edit to the running pipeline. Direction, engine,
@@ -652,7 +690,7 @@ struct WelcomeView: View {
             ).font(.title).multilineTextAlignment(.center)
             Text(
                 step == 0
-                        ? "Live English translates what you're typing without interrupting your workflow."
+                        ? "Pico translates what you're typing without interrupting your workflow."
                         : step == 1
                             ? "Permission lets Pico read only the editable text field. Password fields are always skipped."
                             : "Type something in Chinese in any supported text field."

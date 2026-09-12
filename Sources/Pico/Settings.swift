@@ -409,8 +409,15 @@ struct ReplaceShortcut: Equatable, Sendable {
             onClipboardSettingsChanged?()
         }
     }
+    @Published var autoUpdateEnabled: Bool {
+        didSet {
+            defaults.set(autoUpdateEnabled, forKey: "autoUpdateEnabled")
+            onAutoUpdateChanged?()
+        }
+    }
     /// Assigned by AppState after its translation pipeline has been built.
     var onTranslationSettingsChanged: (() -> Void)?
+    var onAutoUpdateChanged: (() -> Void)?
     /// Fires when any clipboard-translation setting changes so AppState can
     /// re-sync the pasteboard watcher and hotkeys.
     var onClipboardSettingsChanged: (() -> Void)?
@@ -481,6 +488,7 @@ struct ReplaceShortcut: Equatable, Sendable {
             defaults: defaults, keyCodeKey: "translateShortcutKeyCode", modifiersKey: "translateShortcutModifiers",
             fallback: .controlShiftT)
         clipboardTranslationEnabled = defaults.object(forKey: "clipboardTranslationEnabled") as? Bool ?? false
+        autoUpdateEnabled = defaults.object(forKey: "autoUpdateEnabled") as? Bool ?? true
         clipboardTriggerMode =
             ClipboardTriggerMode(rawValue: defaults.string(forKey: "clipboardTriggerMode") ?? "") ?? .hotkey
         clipboardShortcut = Self.loadShortcut(

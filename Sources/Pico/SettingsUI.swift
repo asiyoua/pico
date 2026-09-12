@@ -542,6 +542,7 @@ struct SettingsView: View {
     @ObservedObject var state: AppState
     @ObservedObject private var settings: SettingsStore
     @ObservedObject private var history: TranslationHistoryController
+    @ObservedObject private var autoUpdater: AutoUpdateController
     @State private var selectedPage: Page = .general
     @State private var draggedModelID: UUID?
     @State private var historyExportMessage: String?
@@ -551,9 +552,27 @@ struct SettingsView: View {
         self.state = state
         self._settings = ObservedObject(wrappedValue: state.settings)
         self._history = ObservedObject(wrappedValue: state.history)
+        self._autoUpdater = ObservedObject(wrappedValue: state.autoUpdater)
     }
 
     private var lang: UILanguage { settings.uiLanguage }
+
+    private var autoUpdateStatusText: String {
+        switch autoUpdater.phase {
+        case .idle:
+            return "—"
+        case .checking:
+            return L10n.autoUpdateChecking(lang)
+        case .upToDate:
+            return L10n.autoUpdateUpToDate(lang)
+        case .downloading(let progress):
+            return "\(L10n.autoUpdateDownloading(lang)) \(Int(progress * 100))%"
+        case .installing:
+            return L10n.autoUpdateInstalling(lang)
+        case .failed(let message):
+            return "\(L10n.autoUpdateFailed(lang))：\(message)"
+        }
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -609,6 +628,8 @@ struct SettingsView: View {
             .background(
                 selected ? Color.accentColor : Color.clear,
                 in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            // 整行都可点击（否则透明背景区域点击会穿透）
+            .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             .foregroundStyle(selected ? .white : .primary)
         }
         .buttonStyle(.plain)
@@ -661,6 +682,17 @@ struct SettingsView: View {
                 }
                 SettingsRow(label: L10n.launchAtLogin(lang), divider: false) {
                     smallToggle($state.settings.launchAtLogin)
+                }
+            }
+            SettingsGroup(title: L10n.autoUpdateGroupTitle(lang)) {
+                SettingsRow(label: L10n.autoUpdateToggle(lang)) {
+                    smallToggle($state.settings.autoUpdateEnabled)
+                }
+                SettingsRow(label: L10n.autoUpdateStatus(lang), divider: false) {
+                    Text(autoUpdateStatusText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.trailing)
                 }
             }
             SettingsGroup(title: L10n.groupLanguageTitle(lang)) {

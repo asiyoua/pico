@@ -483,6 +483,33 @@ enum L10n {
         lang == .chinese ? "排除的应用" : "Excluded Apps"
     }
 
+    // MARK: - Auto update
+
+    static func autoUpdateGroupTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "自动更新" : "Software Update"
+    }
+    static func autoUpdateToggle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "自动安装更新" : "Install Updates Automatically"
+    }
+    static func autoUpdateStatus(_ lang: UILanguage) -> String {
+        lang == .chinese ? "状态" : "Status"
+    }
+    static func autoUpdateChecking(_ lang: UILanguage) -> String {
+        lang == .chinese ? "正在检查更新…" : "Checking for updates…"
+    }
+    static func autoUpdateUpToDate(_ lang: UILanguage) -> String {
+        lang == .chinese ? "已是最新版本" : "Up to date"
+    }
+    static func autoUpdateDownloading(_ lang: UILanguage) -> String {
+        lang == .chinese ? "正在下载更新" : "Downloading update"
+    }
+    static func autoUpdateInstalling(_ lang: UILanguage) -> String {
+        lang == .chinese ? "准备完成，即将自动重启安装…" : "Ready — restarting to install…"
+    }
+    static func autoUpdateFailed(_ lang: UILanguage) -> String {
+        lang == .chinese ? "更新失败" : "Update failed"
+    }
+
     // MARK: - History safety
 
     static func historyClear(_ lang: UILanguage) -> String {
