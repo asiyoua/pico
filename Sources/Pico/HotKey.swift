@@ -11,7 +11,7 @@ enum TranslationHotKeyAction: UInt32, CaseIterable {
 @MainActor
 final class GlobalHotKey {
     static let shared = GlobalHotKey()
-    private static let signature: OSType = 0x46544143  // 'FTAC'
+    private static let signature: OSType = 0x5049434F  // 'PICO'
     var onAction: ((TranslationHotKeyAction) -> Void)?
     private var refs: [UInt32: EventHotKeyRef] = [:]
     private var handler: EventHandlerRef?

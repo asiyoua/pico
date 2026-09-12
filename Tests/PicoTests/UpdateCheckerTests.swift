@@ -50,7 +50,7 @@ final class UpdateCheckerTests: XCTestCase {
     }
 
     func testNewerPayloadReturnsReleaseURL() async {
-        let html = "https://github.com/krisir/floattrans/releases/tag/v0.2.0"
+        let html = "https://github.com/asiyoua/pico/releases/tag/v0.2.0"
         let checker = UpdateChecker(currentVersion: "0.1.0") { _ in
             githubOK(tag: "v0.2.0", html: html)
         }
@@ -62,7 +62,7 @@ final class UpdateCheckerTests: XCTestCase {
 
     func testSameVersionIsUpToDateAndDoesNotOpen() async {
         let checker = UpdateChecker(currentVersion: "0.1.0") { _ in
-            githubOK(tag: "v0.1.0", html: "https://github.com/krisir/floattrans/releases/tag/v0.1.0")
+            githubOK(tag: "v0.1.0", html: "https://github.com/asiyoua/pico/releases/tag/v0.1.0")
         }
         let result = await checker.check()
         XCTAssertEqual(result, .upToDate)
@@ -72,7 +72,7 @@ final class UpdateCheckerTests: XCTestCase {
 
     func testLowerRemoteIsUpToDate() async {
         let checker = UpdateChecker(currentVersion: "0.2.0") { _ in
-            githubOK(tag: "0.1.9", html: "https://github.com/krisir/floattrans/releases/tag/v0.1.9")
+            githubOK(tag: "0.1.9", html: "https://github.com/asiyoua/pico/releases/tag/v0.1.9")
         }
         let result = await checker.check()
         XCTAssertEqual(result, .upToDate)
@@ -109,7 +109,7 @@ final class UpdateCheckerTests: XCTestCase {
 
     func testNonNumericTagIsFailed() async {
         let checker = UpdateChecker(currentVersion: "0.1.0") { _ in
-            githubOK(tag: "nightly", html: "https://github.com/krisir/floattrans/releases/tag/nightly")
+            githubOK(tag: "nightly", html: "https://github.com/asiyoua/pico/releases/tag/nightly")
         }
         let result = await checker.check()
         XCTAssertEqual(result, .failed)
