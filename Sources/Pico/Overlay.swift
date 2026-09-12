@@ -34,11 +34,6 @@ struct TranslationOverlayView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(theme.accentColor.opacity(0.85))
-                .frame(width: 3)
-                .padding(.leading, 14)
-                .padding(.vertical, 15)
             Text(text)
                 .font(.system(size: fontSize, weight: .medium))
                 .foregroundStyle(.primary)
@@ -46,7 +41,7 @@ struct TranslationOverlayView: View {
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 12)
+                .padding(.leading, 16)
                 .padding(.trailing, 6)
                 .padding(.vertical, 14)
             HStack(spacing: 6) {
