@@ -43,17 +43,19 @@ enum AutoUpdateError: LocalizedError {
 
 // MARK: - Auto update controller
 
-/// Checks GitHub Releases and, when 自动更新 is enabled, downloads a newer
-/// release and swaps the app in place: the downloaded DMG is staged, the app
-/// quits, a detached helper replaces /Applications/Pico.app and relaunches.
-/// The replacement carries the same bundle id and signing certificate, so the
-/// accessibility grant and every setting survive each update.
+/// Checks GitHub Releases and, when 自动检查更新 is enabled, asks the user
+/// before updating: a non-blocking alert offers 立即更新 / 暂不更新. On
+/// consent the release is downloaded, the app quits itself and a detached
+/// helper replaces /Applications/Pico.app and relaunches. The replacement
+/// carries the same bundle id and signing certificate, so the accessibility
+/// grant and every setting survive each update.
 @MainActor
 final class AutoUpdateController: ObservableObject {
     enum Phase: Equatable {
         case idle
         case checking
         case upToDate
+        case available(version: String)
         case downloading(progress: Double)
         case installing
         case failed(String)
@@ -67,6 +69,8 @@ final class AutoUpdateController: ObservableObject {
     private let settings: SettingsStore
     private var timer: Timer?
     private var scheduledCheck: Task<Void, Never>?
+    private var pendingRelease: PicoReleaseInfo?
+    private var skippedVersion: String?
 
     init(settings: SettingsStore) {
         self.settings = settings
@@ -112,18 +116,81 @@ final class AutoUpdateController: ObservableObject {
                 phase = .upToDate
                 return
             }
-            guard let dmg = release.dmgAsset, let url = URL(string: dmg.browserDownloadURL) else {
+            guard release.dmgAsset != nil else {
                 throw AutoUpdateError.noInstallerAsset
             }
+            // 本会话内用户已对同一版本点过「暂不」，静默视为最新，不再打扰
+            guard release.tagName != skippedVersion else {
+                phase = .upToDate
+                return
+            }
+            pendingRelease = release
+            phase = .available(version: release.tagName)
+            presentUpdatePrompt(version: release.tagName)
+        } catch is CancellationError {
+            // a newer check superseded this one
+        } catch {
+            phase = .failed(error.localizedDescription)
+        }
+    }
+
+    // MARK: Update prompt
+
+    /// 非阻塞弹窗：借 NSAlert 自带的窗口作宿主挂 sheet，不跑嵌套 runloop，
+    /// 等待期间翻译等主线程功能照常工作。
+    private func presentUpdatePrompt(version: String) {
+        let lang = settings.uiLanguage
+        let alert = NSAlert()
+        alert.messageText = L10n.updateAvailableTitle(lang)
+        alert.informativeText = L10n.updateAvailableBody(lang, version)
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: L10n.updateNowButton(lang))
+        alert.addButton(withTitle: L10n.updateLaterButton(lang))
+        let hostWindow = alert.window
+        alert.beginSheetModal(for: hostWindow) { [weak self] response in
+            hostWindow.orderOut(nil)
+            if response == .alertFirstButtonReturn {
+                self?.confirmUpdate()
+            } else {
+                self?.postponeUpdate()
+            }
+        }
+        hostWindow.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func confirmUpdate() {
+        guard let release = pendingRelease, case .available = phase else { return }
+        guard let dmg = release.dmgAsset, let url = URL(string: dmg.browserDownloadURL) else {
+            phase = .failed(AutoUpdateError.noInstallerAsset.localizedDescription)
+            return
+        }
+        Task { [weak self] in
+            await self?.downloadAndInstall(release: release, assetURL: url, expectedSize: dmg.size)
+        }
+    }
+
+    func postponeUpdate() {
+        if let release = pendingRelease {
+            skippedVersion = release.tagName
+        }
+        pendingRelease = nil
+        phase = .upToDate
+    }
+
+    private func downloadAndInstall(release: PicoReleaseInfo, assetURL: URL, expectedSize: Int) async {
+        do {
             phase = .downloading(progress: 0)
-            let data = try await download(from: url, expectedSize: dmg.size) { [weak self] fraction in
+            let data = try await download(from: assetURL, expectedSize: expectedSize) { [weak self] fraction in
                 self?.phase = .downloading(progress: fraction)
             }
             phase = .installing
             let staged = try stageDownloadedUpdate(data: data, version: release.tagName)
             applyStagedUpdateAndRelaunch(dmgFile: staged)
-        } catch is CancellationError {
-            // a newer check superseded this one
+            // helper 会等进程退出再换装；这里给 spawn 留半拍后优雅退出
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                NSApp.terminate(nil)
+            }
         } catch {
             phase = .failed(error.localizedDescription)
         }
