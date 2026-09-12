@@ -20,15 +20,22 @@ func boltPath(in size: CGFloat) -> NSBezierPath {
 }
 
 func export(_ size: Int) {
-    let image = NSImage(size: NSSize(width: size, height: size))
-    image.lockFocus()
+    // Explicit bitmap at exact pixel dims — NSImage lockFocus would render at
+    // the Retina backing scale and double every PNG.
+    let rep = NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size,
+        bitsPerSample: 8, samplesPerPixel: 4,
+        hasAlpha: true, isPlanar: false,
+        colorSpaceName: .calibratedRGB, bytesPerRow: 0, bitsPerPixel: 0)!
+    rep.size = NSSize(width: size, height: size)
+    NSGraphicsContext.saveGraphicsState()
+    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
     NSColor.black.setFill()
     let path = boltPath(in: CGFloat(size))
     path.fill()
     path.lineWidth = CGFloat(size) / 16.0
     path.stroke()
-    image.unlockFocus()
-    let rep = NSBitmapImageRep(data: image.tiffRepresentation!)!
+    NSGraphicsContext.restoreGraphicsState()
     guard let png = rep.representation(using: .png, properties: [:]) else { fatalError() }
     try! png.write(to: URL(fileURLWithPath: "Resources/Assets.xcassets/MenuBarIcon.imageset/MenuBarIcon-\(size).png"))
     print("wrote MenuBarIcon-\(size).png")
