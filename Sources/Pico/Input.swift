@@ -135,6 +135,7 @@ public struct InputSessionID: Hashable, Sendable {
     /// keystroke, which is noticeable against slow accessibility apps.
     private var focusedFieldFrame: NSRect?
     private(set) var isRunning = false
+    private var lastResolvedProbe = Date.distantPast
     func start() {
         guard AXIsProcessTrusted() else {
             DiagnosticLog.write("AX trust check failed")
@@ -176,6 +177,10 @@ public struct InputSessionID: Hashable, Sendable {
         onFocusChanged?()
         let appElement = AXUIElementCreateApplication(pid)
         focusedApp = appElement
+        // Chromium-based apps (WPS, Chrome, Edge…) build their accessibility
+        // tree lazily; nudging these attributes makes them expose it.
+        AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(appElement, "AXManualAccessibility" as CFString, kCFBooleanTrue)
         observe(appElement, app: appElement, appInfo: app)
         refreshFocusedElement(app: app)
     }
@@ -289,7 +294,14 @@ public struct InputSessionID: Hashable, Sendable {
         guard !resolved.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return (resolved, captured?.session ?? session, captured?.screen ?? NSScreen.main)
     }
-    private func readSnapshot() {
+    func readSnapshot() {
+        // Chromium apps build their AX tree asynchronously after the nudge;
+        // keep re-probing while no text element has been resolved yet.
+        if focused == nil, Date().timeIntervalSince(lastResolvedProbe) > 2,
+            let app = NSWorkspace.shared.frontmostApplication {
+            lastResolvedProbe = Date()
+            refreshFocusedElement(app: app)
+        }
         _ = readFocusedText(force: false)
     }
     private func readFocusedText(force: Bool) -> (snapshot: TextSnapshot, session: InputSessionID, screen: NSScreen?)?

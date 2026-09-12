@@ -461,6 +461,11 @@ struct MenuBarMenu: View {
         else { return }
         if text.count > 2000 { text = String(text.prefix(2000)) }
         if autoTriggered {
+            // 黑名单应用保持完全静音：前台是排除应用时不触发剪贴板翻译
+            if let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                settings.excludedBundleIDs.contains(front) {
+                return
+            }
             guard LanguageTextDetector().contains(text, language: settings.sourceLanguage) else { return }
         }
         let session = InputSessionID(pid: ProcessInfo.processInfo.processIdentifier)
