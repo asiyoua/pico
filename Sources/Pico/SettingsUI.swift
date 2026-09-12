@@ -845,24 +845,25 @@ struct SettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             SettingsGroup(title: L10n.clipboardGroup(lang)) {
-                SettingsRow(label: L10n.clipboardTranslate(lang), divider: settings.clipboardTriggerMode == .hotkey) {
+                SettingsRow(label: L10n.clipboardTranslate(lang)) {
                     smallToggle($settings.clipboardTranslationEnabled)
                 }
                 if settings.clipboardTranslationEnabled {
+                    // 触发方式选择器必须常显：默认是快捷键模式，
+                    // 若只在自动监听模式下渲染，新用户没有入口切过去。
+                    SettingsRow(label: L10n.clipboardTrigger(lang), divider: settings.clipboardTriggerMode == .hotkey) {
+                        TrailingPicker(width: 160, selection: $settings.clipboardTriggerMode) {
+                            ForEach(ClipboardTriggerMode.allCases, id: \.self) { mode in
+                                Text(mode.displayName(for: lang)).tag(mode)
+                            }
+                        }
+                    }
                     if settings.clipboardTriggerMode == .hotkey {
                         SettingsRow(label: L10n.clipboardShortcut(lang), divider: false) {
                             ShortcutRecorderButton(
                                 language: lang,
                                 shortcut: settings.clipboardShortcut,
                                 onCommit: { settings.clipboardShortcut = $0 })
-                        }
-                    } else {
-                        SettingsRow(label: L10n.clipboardTrigger(lang), divider: false) {
-                            TrailingPicker(width: 160, selection: $settings.clipboardTriggerMode) {
-                                ForEach(ClipboardTriggerMode.allCases, id: \.self) { mode in
-                                    Text(mode.displayName(for: lang)).tag(mode)
-                                }
-                            }
                         }
                     }
                 }
