@@ -565,6 +565,8 @@ struct SettingsView: View {
             return L10n.autoUpdateChecking(lang)
         case .upToDate:
             return L10n.autoUpdateUpToDate(lang)
+        case .available(let version):
+            return L10n.autoUpdateAvailable(lang, version)
         case .downloading(let progress):
             return "\(L10n.autoUpdateDownloading(lang)) \(Int(progress * 100))%"
         case .installing:

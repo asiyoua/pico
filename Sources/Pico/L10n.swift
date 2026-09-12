@@ -489,7 +489,7 @@ enum L10n {
         lang == .chinese ? "自动更新" : "Software Update"
     }
     static func autoUpdateToggle(_ lang: UILanguage) -> String {
-        lang == .chinese ? "自动安装更新" : "Install Updates Automatically"
+        lang == .chinese ? "自动检查更新" : "Check for Updates Automatically"
     }
     static func autoUpdateStatus(_ lang: UILanguage) -> String {
         lang == .chinese ? "状态" : "Status"
@@ -500,14 +500,31 @@ enum L10n {
     static func autoUpdateUpToDate(_ lang: UILanguage) -> String {
         lang == .chinese ? "已是最新版本" : "Up to date"
     }
+    static func autoUpdateAvailable(_ lang: UILanguage, _ version: String) -> String {
+        lang == .chinese ? "发现新版本 \(version)" : "New version \(version) available"
+    }
     static func autoUpdateDownloading(_ lang: UILanguage) -> String {
         lang == .chinese ? "正在下载更新" : "Downloading update"
     }
     static func autoUpdateInstalling(_ lang: UILanguage) -> String {
-        lang == .chinese ? "准备完成，即将自动重启安装…" : "Ready — restarting to install…"
+        lang == .chinese ? "准备完成，即将重启安装…" : "Ready — restarting to install…"
     }
     static func autoUpdateFailed(_ lang: UILanguage) -> String {
         lang == .chinese ? "更新失败" : "Update failed"
+    }
+    static func updateAvailableTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "发现 Pico 新版本" : "A new version of Pico is available"
+    }
+    static func updateAvailableBody(_ lang: UILanguage, _ version: String) -> String {
+        lang == .chinese
+            ? "Pico \(version) 已发布，要现在更新吗？\n下载完成后应用会自动重启完成安装。"
+            : "Pico \(version) is ready to install. Update now?\nThe app restarts automatically after downloading."
+    }
+    static func updateNowButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "立即更新" : "Update Now"
+    }
+    static func updateLaterButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "暂不更新" : "Not Now"
     }
 
     // MARK: - History safety
