@@ -22,10 +22,7 @@ struct TranslationOverlayView: View {
     let surface: OverlaySurfaceEffect
     let onClose: () -> Void
     let onCopy: () -> Void
-    let dragOrigin: () -> CGPoint
-    let onDrag: (CGPoint) -> Void
 
-    @State private var dragStartOrigin: CGPoint?
     @State private var closeHovered = false
     @State private var copyHovered = false
     @State private var copied = false
@@ -84,10 +81,9 @@ struct TranslationOverlayView: View {
                 }
                 .overlay { shape.stroke(theme.accentColor.opacity(0.35), lineWidth: 1) }
         }
-        // The whole card is a move handle; the buttons above still win for
-        // plain clicks because a click never starts a drag.
-        .contentShape(shape)
-        .gesture(moveGesture)
+        // The whole card is a move handle; window dragging is driven by the
+        // window server via isMovableByWindowBackground (set on the panel), so
+        // buttons above still win for plain clicks.
     }
 
     private func chipBackground(highlighted: Bool) -> some View {
@@ -102,19 +98,6 @@ struct TranslationOverlayView: View {
         case .thick: shape.fill(.thickMaterial)
         case .solid: shape.fill(Color(nsColor: .windowBackgroundColor))
         }
-    }
-
-    private var moveGesture: some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                if dragStartOrigin == nil { dragStartOrigin = dragOrigin() }
-                let origin = dragStartOrigin ?? .zero
-                onDrag(
-                    CGPoint(
-                        x: origin.x + value.translation.width,
-                        y: origin.y - value.translation.height))
-            }
-            .onEnded { _ in dragStartOrigin = nil }
     }
 
     private func copyTapped() {
@@ -139,6 +122,8 @@ struct TranslationOverlayView: View {
         var isPinned = false
         var usesAnchor = false
         var hideTask: Task<Void, Never>?
+        /// Lets us detach the didMove observer when the entry goes away.
+        var moveObserver: NSObjectProtocol?
         init(id: UUID, key: String, panel: NSPanel, screen: NSScreen?, avoid: NSRect?, text: String) {
             self.id = id
             self.key = key
@@ -153,6 +138,9 @@ struct TranslationOverlayView: View {
     /// Top-left corner the next fresh overlay should use. Set when the user
     /// drags a panel; cleared when the configured position changes.
     private var anchor: CGPoint?
+    /// True while we move panels ourselves (placement/relayout); didMove
+    /// notifications arriving outside these windows are user drags.
+    private var isApplyingProgrammaticFrame = false
     var hideAfter: Double = 4
     var neverHide = false
     var textSize: OverlayTextSize = .medium
@@ -222,13 +210,24 @@ struct TranslationOverlayView: View {
         panel.backgroundColor = .clear
         panel.level = .floating
         panel.ignoresMouseEvents = false
+        // Window-server-driven dragging: the move tracks the cursor 1:1
+        // without a per-event round trip through the main thread.
+        panel.isMovableByWindowBackground = true
         panel.alphaValue = CGFloat(min(max(cardOpacity, 0.3), 1))
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.contentView = NSHostingView(rootView: makeView(text: text, id: id, panel: panel))
         let entry = Entry(id: id, key: key, panel: panel, screen: target, avoid: avoid, text: text)
+        entry.moveObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didMoveNotification, object: panel, queue: .main
+        ) { [weak self, weak panel] _ in
+            guard let self, let panel, !self.isApplyingProgrammaticFrame else { return }
+            self.pin(id, topLeft: CGPoint(x: panel.frame.minX, y: panel.frame.maxY))
+        }
         entries.append(entry)
         relayout()
+        isApplyingProgrammaticFrame = true
         panel.orderFrontRegardless()
+        isApplyingProgrammaticFrame = false
         scheduleHide(for: entry)
     }
 
@@ -242,12 +241,6 @@ struct TranslationOverlayView: View {
             onCopy: { [weak self] in
                 TranslationClipboard.copy(text)
                 self?.onCopyToPasteboard?(text)
-            },
-            dragOrigin: { [weak panel] in panel?.frame.origin ?? .zero },
-            onDrag: { [weak self, weak panel] newOrigin in
-                guard let panel else { return }
-                panel.setFrameOrigin(newOrigin)
-                self?.pin(id, topLeft: CGPoint(x: panel.frame.minX, y: panel.frame.maxY))
             })
     }
 
@@ -272,6 +265,7 @@ struct TranslationOverlayView: View {
     func hide() {
         for entry in entries {
             entry.hideTask?.cancel()
+            if let observer = entry.moveObserver { NotificationCenter.default.removeObserver(observer) }
             entry.panel.orderOut(nil)
         }
         entries.removeAll()
@@ -280,6 +274,7 @@ struct TranslationOverlayView: View {
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
         let entry = entries.remove(at: index)
         entry.hideTask?.cancel()
+        if let observer = entry.moveObserver { NotificationCenter.default.removeObserver(observer) }
         entry.panel.orderOut(nil)
         // Relayout each remaining panel on its own screen so closing one
         // overlay on a secondary display does not move the others to the main
@@ -287,6 +282,8 @@ struct TranslationOverlayView: View {
         relayout()
     }
     private func relayout() {
+        isApplyingProgrammaticFrame = true
+        defer { isApplyingProgrammaticFrame = false }
         var stackIndex = 0
         for entry in entries {
             entry.panel.contentView?.layoutSubtreeIfNeeded()
