@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 // MARK: - GitHub release metadata
 
@@ -136,27 +137,37 @@ final class AutoUpdateController: ObservableObject {
 
     // MARK: Update prompt
 
-    /// 非阻塞弹窗：借 NSAlert 自带的窗口作宿主挂 sheet，不跑嵌套 runloop，
-    /// 等待期间翻译等主线程功能照常工作。
+    private var promptWindow: NSWindow?
+
+    /// 非阻塞提示窗：普通 NSWindow + SwiftUI（同欢迎窗模式），不跑 modal
+    /// 或 sheet，等待用户决定期间翻译等主线程功能照常工作。
     private func presentUpdatePrompt(version: String) {
         let lang = settings.uiLanguage
-        let alert = NSAlert()
-        alert.messageText = L10n.updateAvailableTitle(lang)
-        alert.informativeText = L10n.updateAvailableBody(lang, version)
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: L10n.updateNowButton(lang))
-        alert.addButton(withTitle: L10n.updateLaterButton(lang))
-        let hostWindow = alert.window
-        alert.beginSheetModal(for: hostWindow) { [weak self] response in
-            hostWindow.orderOut(nil)
-            if response == .alertFirstButtonReturn {
-                self?.confirmUpdate()
-            } else {
-                self?.postponeUpdate()
-            }
-        }
-        hostWindow.makeKeyAndOrderFront(nil)
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 170),
+            styleMask: [.titled],
+            backing: .buffered, defer: false)
+        window.title = L10n.updateAvailableTitle(lang)
+        window.contentView = NSHostingView(
+            rootView: UpdatePromptView(
+                lang: lang, version: version,
+                onConfirm: { [weak self] in
+                    self?.closePromptWindow()
+                    self?.confirmUpdate()
+                },
+                onPostpone: { [weak self] in
+                    self?.closePromptWindow()
+                    self?.postponeUpdate()
+                }))
+        window.center()
+        promptWindow = window
+        window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func closePromptWindow() {
+        promptWindow?.orderOut(nil)
+        promptWindow = nil
     }
 
     func confirmUpdate() {
@@ -199,6 +210,16 @@ final class AutoUpdateController: ObservableObject {
     // MARK: Steps
 
     private func fetchLatestRelease() async throws -> PicoReleaseInfo {
+        do {
+            return try await fetchReleaseViaAPI()
+        } catch {
+            // API 匿名限流按出口 IP 共享（挂代理时经常 403），回退到
+            // releases/latest 页面重定向拿 tag；下载走附件直链，均无 API 限流
+            return try await fetchReleaseViaPageRedirect()
+        }
+    }
+
+    private func fetchReleaseViaAPI() async throws -> PicoReleaseInfo {
         var request = URLRequest(url: UpdateChecker.latestReleaseURL)
         request.setValue(UpdateChecker.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -207,6 +228,22 @@ final class AutoUpdateController: ObservableObject {
             throw AutoUpdateError.badResponse
         }
         return try JSONDecoder().decode(PicoReleaseInfo.self, from: data)
+    }
+
+    private func fetchReleaseViaPageRedirect() async throws -> PicoReleaseInfo {
+        var request = URLRequest(url: UpdateChecker.latestReleasePageURL)
+        request.setValue(UpdateChecker.userAgent, forHTTPHeaderField: "User-Agent")
+        let (_, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+            let tag = UpdateChecker.tagFromFinalURL(response.url)
+        else {
+            throw AutoUpdateError.badResponse
+        }
+        let version = UpdateChecker.stripLeadingV(tag)
+        let asset = PicoReleaseInfo.Asset(
+            name: "Pico-\(version).dmg", size: 0,
+            browserDownloadURL: "https://github.com/asiyoua/pico/releases/download/\(tag)/Pico-\(version).dmg")
+        return PicoReleaseInfo(tagName: tag, assets: [asset])
     }
 
     private func download(
@@ -223,6 +260,10 @@ final class AutoUpdateController: ObservableObject {
         var lastReport = Date.distantPast
         for try await byte in asyncBytes {
             data.append(byte)
+            // 重定向回退拿不到 asset 元数据（size=0），用绝对上限兜底
+            guard data.count <= Self.downloadSizeCap else {
+                throw AutoUpdateError.sizeMismatch
+            }
             if Date().timeIntervalSince(lastReport) > 0.2 {
                 lastReport = Date()
                 let fraction = expectedSize > 0 ? Double(data.count) / Double(expectedSize) : 0
@@ -271,5 +312,30 @@ final class AutoUpdateController: ObservableObject {
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
         try? process.run()
+    }
+}
+
+private struct UpdatePromptView: View {
+    let lang: UILanguage
+    let version: String
+    let onConfirm: () -> Void
+    let onPostpone: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L10n.updateAvailableBody(lang, version))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button(L10n.updateLaterButton(lang)) { onPostpone() }
+                    .keyboardShortcut(.cancelAction)
+                Button(L10n.updateNowButton(lang)) { onConfirm() }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(20)
+        .frame(width: 360)
     }
 }

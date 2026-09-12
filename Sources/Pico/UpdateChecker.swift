@@ -44,6 +44,9 @@ struct GitHubLatestRelease: Decodable, Sendable {
 
 struct UpdateChecker: Sendable {
     static let latestReleaseURL = URL(string: "https://api.github.com/repos/asiyoua/pico/releases/latest")!
+    // GitHub API 匿名限流按出口 IP 共享，挂代理时经常 403；releases/latest
+    // 页面 302 到 /releases/tag/<tag>，网页域名不吃 API 限流，作为回退。
+    static let latestReleasePageURL = URL(string: "https://github.com/asiyoua/pico/releases/latest")!
     static let userAgent = "Pico (https://github.com/asiyoua/pico)"
 
     var currentVersion: String
@@ -64,6 +67,12 @@ struct UpdateChecker: Sendable {
         let local = currentVersion.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !local.isEmpty else { return .failed }
 
+        let viaAPI = await checkViaAPI(local: local)
+        if viaAPI != .failed { return viaAPI }
+        return await checkViaReleasePage(local: local)
+    }
+
+    private func checkViaAPI(local: String) async -> UpdateCheckResult {
         var request = URLRequest(url: Self.latestReleaseURL)
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -94,8 +103,33 @@ struct UpdateChecker: Sendable {
             return .failed
         }
 
-        switch Self.compare(local: local, remoteTag: tag) {
+        return Self.result(local: local, remoteTag: tag, newerURL: url)
+    }
+
+    private func checkViaReleasePage(local: String) async -> UpdateCheckResult {
+        var request = URLRequest(url: Self.latestReleasePageURL)
+        request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+        guard
+            let (_, response) = try? await fetch(request),
+            let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+            let tag = Self.tagFromFinalURL(response.url)
+        else { return .failed }
+        return Self.result(
+            local: local, remoteTag: tag,
+            newerURL: URL(string: "https://github.com/asiyoua/pico/releases/tag/\(tag)"))
+    }
+
+    /// 从跟随重定向后的最终 URL 提取 tag，如 …/releases/tag/v1.0.1 → v1.0.1
+    static func tagFromFinalURL(_ url: URL?) -> String? {
+        guard let part = url?.path.split(separator: "/").last, part.hasPrefix("v") else { return nil }
+        let tag = String(part)
+        return dottedIntegers(tag) != nil ? tag : nil
+    }
+
+    private static func result(local: String, remoteTag: String, newerURL: URL?) -> UpdateCheckResult {
+        switch Self.compare(local: local, remoteTag: remoteTag) {
         case .remoteNewer:
+            guard let url = newerURL, url.scheme == "https" || url.scheme == "http" else { return .failed }
             return .newer(url)
         case .notNewer:
             return .upToDate

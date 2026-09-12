@@ -27,15 +27,15 @@ final class UpdateCheckerTests: XCTestCase {
     }
 
     func testRequestUsesGitHubLatestAndUserAgent() async {
-        let captured = LockIsolated<URLRequest?>(nil)
+        let captured = LockIsolated<[URLRequest]>([])
         let checker = UpdateChecker(currentVersion: "0.1.0") { request in
-            captured.set(request)
+            captured.set(captured.value + [request])
             throw URLError(.notConnectedToInternet)
         }
         _ = await checker.check()
-        XCTAssertEqual(captured.value?.url, UpdateChecker.latestReleaseURL)
-        XCTAssertEqual(captured.value?.httpMethod, "GET")
-        XCTAssertEqual(captured.value?.value(forHTTPHeaderField: "User-Agent"), UpdateChecker.userAgent)
+        XCTAssertEqual(captured.value.first?.url, UpdateChecker.latestReleaseURL)
+        XCTAssertEqual(captured.value.first?.httpMethod, "GET")
+        XCTAssertEqual(captured.value.first?.value(forHTTPHeaderField: "User-Agent"), UpdateChecker.userAgent)
     }
 
     func testEmptyLocalVersionFailsWithoutFetch() async {
@@ -122,6 +122,52 @@ final class UpdateCheckerTests: XCTestCase {
         let result = await checker.check()
         XCTAssertEqual(result, .failed)
     }
+
+    // MARK: Release-page fallback (shared-IP API rate limit, e.g. behind a proxy)
+
+    func testFallsBackToReleasePageWhenAPIRateLimited() async {
+        let checker = UpdateChecker(currentVersion: "0.1.0") { request in
+            if request.url == UpdateChecker.latestReleaseURL {
+                return githubHTTP(403, body: "{\"message\":\"rate limit\"}")
+            }
+            return pageResponse(finalURL: URL(string: "https://github.com/asiyoua/pico/releases/tag/v0.2.0")!)
+        }
+        let result = await checker.check()
+        XCTAssertEqual(
+            result,
+            .newer(URL(string: "https://github.com/asiyoua/pico/releases/tag/v0.2.0")!))
+    }
+
+    func testReleasePageFallbackUpToDate() async {
+        let checker = UpdateChecker(currentVersion: "0.1.0") { request in
+            if request.url == UpdateChecker.latestReleaseURL {
+                return githubHTTP(403, body: "{}")
+            }
+            return pageResponse(finalURL: URL(string: "https://github.com/asiyoua/pico/releases/tag/v0.1.0")!)
+        }
+        let result = await checker.check()
+        XCTAssertEqual(result, .upToDate)
+    }
+
+    func testReleasePageFallbackWithoutTagIsFailed() async {
+        let checker = UpdateChecker(currentVersion: "0.1.0") { request in
+            if request.url == UpdateChecker.latestReleaseURL {
+                return githubHTTP(403, body: "{}")
+            }
+            return pageResponse(finalURL: URL(string: "https://github.com/asiyoua/pico/releases/latest")!)
+        }
+        let result = await checker.check()
+        XCTAssertEqual(result, .failed)
+    }
+
+    func testTagFromFinalURL() {
+        XCTAssertEqual(
+            UpdateChecker.tagFromFinalURL(URL(string: "https://github.com/asiyoua/pico/releases/tag/v1.2.3")),
+            "v1.2.3")
+        XCTAssertNil(UpdateChecker.tagFromFinalURL(URL(string: "https://github.com/asiyoua/pico/releases/latest")))
+        XCTAssertNil(UpdateChecker.tagFromFinalURL(URL(string: "https://github.com/asiyoua/pico/releases/tag/nightly")))
+        XCTAssertNil(UpdateChecker.tagFromFinalURL(nil))
+    }
 }
 
 private final class LockIsolated<Value>: @unchecked Sendable {
@@ -153,4 +199,9 @@ private func githubHTTP(_ status: Int, body: String) -> (Data, URLResponse) {
     let response = HTTPURLResponse(
         url: UpdateChecker.latestReleaseURL, statusCode: status, httpVersion: nil, headerFields: nil)!
     return (Data(body.utf8), response)
+}
+
+private func pageResponse(finalURL: URL) -> (Data, URLResponse) {
+    let response = HTTPURLResponse(url: finalURL, statusCode: 200, httpVersion: nil, headerFields: nil)!
+    return (Data(), response)
 }
