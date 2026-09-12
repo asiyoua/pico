@@ -114,9 +114,11 @@ public struct InputSessionID: Hashable, Sendable {
         lastSentence = sentence
         let nsText = snapshot.text as NSString
         let sentenceRange = nsText.range(of: sentence, options: .backwards)
-        let sentenceKey =
-            sentenceRange.location == NSNotFound
-            ? "\(session.token.uuidString):\(sentence)" : nsText.substring(to: sentenceRange.location)
+        // Scope the key to this input session: the first sentence in every
+        // field has an empty text prefix, and without the token those fields
+        // would all share one key and replace each other's overlay.
+        let prefix = sentenceRange.location == NSNotFound ? sentence : nsText.substring(to: sentenceRange.location)
+        let sentenceKey = "\(session.token.uuidString):\(prefix)"
         onSentence?(sentence, sentenceKey, session, screen, snapshot)
     }
 }
