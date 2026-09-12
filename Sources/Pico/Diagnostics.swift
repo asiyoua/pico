@@ -2,7 +2,7 @@ import Foundation
 
 /// Lightweight file log used while diagnosing Accessibility issues.
 ///
-/// Writing is opt-in: it is enabled by the `FLOATTRANS_DEBUG=1` environment
+/// Writing is opt-in: it is enabled by the `PICO_DEBUG=1` environment
 /// variable or the `debugLogEnabled` user default. This keeps the release
 /// build from growing an unbounded log file for every poll tick. The file is
 /// truncated once it exceeds ``maxBytes`` so long sessions stay bounded.
@@ -38,7 +38,7 @@ enum DiagnosticLog {
     }
 
     private static func isEnabled() -> Bool {
-        ProcessInfo.processInfo.environment["FLOATTRANS_DEBUG"] == "1"
+        ProcessInfo.processInfo.environment["PICO_DEBUG"] == "1"
             || UserDefaults.standard.bool(forKey: "debugLogEnabled")
     }
 

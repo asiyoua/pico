@@ -345,7 +345,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.liveenglish.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = app.pico.tests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pico.app/Contents/MacOS/Pico";
 			};
@@ -359,14 +359,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "浮译";
-				INFOPLIST_KEY_CFBundleName = "浮译";
+				INFOPLIST_KEY_CFBundleDisplayName = Pico;
+				INFOPLIST_KEY_CFBundleName = Pico;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = cc.kristar.floattrans;
+				PRODUCT_BUNDLE_IDENTIFIER = com.asiyoua.pico;
 				PRODUCT_MODULE_NAME = Pico;
 				PRODUCT_NAME = Pico;
 				SDKROOT = macosx;
@@ -451,7 +451,7 @@
 					"@loader_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.liveenglish.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = app.pico.tests;
 				SDKROOT = macosx;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Pico.app/Contents/MacOS/Pico";
 			};
@@ -465,14 +465,14 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "浮译";
-				INFOPLIST_KEY_CFBundleName = "浮译";
+				INFOPLIST_KEY_CFBundleDisplayName = Pico;
+				INFOPLIST_KEY_CFBundleName = Pico;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 15.0;
-				PRODUCT_BUNDLE_IDENTIFIER = cc.kristar.floattrans;
+				PRODUCT_BUNDLE_IDENTIFIER = com.asiyoua.pico;
 				PRODUCT_MODULE_NAME = Pico;
 				PRODUCT_NAME = Pico;
 				SDKROOT = macosx;

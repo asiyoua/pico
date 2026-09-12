@@ -1,7 +1,5 @@
 .build/
 .swiftpm/
-LiveEnglish.app/
-FloatTrans.app/
 dist/
 *.dmg
 .DS_Store

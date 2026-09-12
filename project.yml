@@ -1,6 +1,6 @@
 name: Pico
 options:
-  bundleIdPrefix: cc.kristar
+  bundleIdPrefix: com.asiyoua
   deploymentTarget:
     macOS: "15.0"
   createIntermediateGroups: true
