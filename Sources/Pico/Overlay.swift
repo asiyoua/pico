@@ -33,7 +33,35 @@ struct TranslationOverlayView: View {
     private let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text("PICO")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .tracking(1.6)
+                    .foregroundStyle(theme.accentColor)
+                Spacer(minLength: 8)
+                Button(action: copyTapped) {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(
+                            copied ? theme.accentColor : (copyHovered ? Color.primary : Color.secondary))
+                        .frame(width: 22, height: 22)
+                        .background(chipBackground(highlighted: copyHovered || copied))
+                }
+                .buttonStyle(.plain)
+                .onHover { copyHovered = $0 }
+                .accessibilityLabel(Text("Copy"))
+                Button(action: onClose) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(closeHovered ? Color.primary : Color.secondary)
+                        .frame(width: 22, height: 22)
+                        .background(chipBackground(highlighted: closeHovered))
+                }
+                .buttonStyle(.plain)
+                .onHover { closeHovered = $0 }
+                .accessibilityLabel(Text("Close"))
+            }
             Text(text)
                 .font(.system(size: fontSize, weight: .medium))
                 .foregroundStyle(.primary)
@@ -41,31 +69,11 @@ struct TranslationOverlayView: View {
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 16)
-                .padding(.trailing, 6)
-                .padding(.vertical, 14)
-            HStack(spacing: 6) {
-                Button(action: copyTapped) {
-                    Image(systemName: copied ? "checkmark.circle.fill" : "doc.on.doc")
-                        .font(.system(size: 13))
-                        .foregroundStyle(
-                            copied ? theme.accentColor : (copyHovered ? Color.primary : Color.secondary))
-                }
-                .buttonStyle(.plain)
-                .onHover { copyHovered = $0 }
-                .accessibilityLabel(Text("Copy"))
-                Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(closeHovered ? Color.primary : Color.secondary)
-                }
-                .buttonStyle(.plain)
-                .onHover { closeHovered = $0 }
-                .accessibilityLabel(Text("Close"))
-            }
-            .padding(.top, 10)
-            .padding(.trailing, 10)
         }
+        .padding(.leading, 16)
+        .padding(.trailing, 12)
+        .padding(.top, 10)
+        .padding(.bottom, 13)
         .frame(minWidth: 340, maxWidth: 600)
         .background {
             surfaceShape
@@ -74,12 +82,17 @@ struct TranslationOverlayView: View {
                         shape.fill(theme.accentColor.opacity(0.10))
                     }
                 }
-                .overlay { shape.stroke(Color.primary.opacity(0.12), lineWidth: 1) }
+                .overlay { shape.stroke(theme.accentColor.opacity(0.35), lineWidth: 1) }
         }
         // The whole card is a move handle; the buttons above still win for
         // plain clicks because a click never starts a drag.
         .contentShape(shape)
         .gesture(moveGesture)
+    }
+
+    private func chipBackground(highlighted: Bool) -> some View {
+        RoundedRectangle(cornerRadius: 6, style: .continuous)
+            .fill(Color.primary.opacity(highlighted ? 0.09 : 0.05))
     }
 
     @ViewBuilder private var surfaceShape: some View {
