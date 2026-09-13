@@ -15,6 +15,9 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 # committed as Resources/AppIcon.icns instead of living in the catalog.
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
+# MIT obligation rides with the distributed copy: keep LICENSE inside the bundle.
+cp LICENSE "$APP/Contents/Resources/LICENSE"
+
 # Compile the remaining asset catalog images (menu bar / history icons).
 xcrun actool \
   --platform macosx \
