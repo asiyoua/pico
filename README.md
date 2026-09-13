@@ -1,6 +1,6 @@
 # Pico 皮可
 
-[下载最新版](https://github.com/asiyoua/pico/releases/latest/download/Pico.dmg) · 问题反馈：[Issues](https://github.com/asiyoua/pico/issues)
+[下载最新版](https://github.com/asiyoua/pico/releases/latest) · 问题反馈：[Issues](https://github.com/asiyoua/pico/issues)
 
 Pico（皮可）是一只住在你菜单栏里的 macOS 实时翻译小助手：在支持无障碍（Accessibility）的文本输入框中打字，译文以低打扰浮窗实时浮现；微信这类不暴露无障碍接口的应用，复制一下按 ⌥⇧V 也能翻译。
 名字取自物理词头 pico-（10⁻¹²）——又小又快。
@@ -56,7 +56,7 @@ Pico（皮可）是一只住在你菜单栏里的 macOS 实时翻译小助手：
 
 ## 安装
 
-1. 从 [Releases](https://github.com/asiyoua/pico/releases/latest/download/Pico.dmg) 下载 DMG，把 Pico 拖入「应用程序」
+1. 从 [Releases](https://github.com/asiyoua/pico/releases/latest) 下载 DMG，把 Pico 拖入「应用程序」
 2. 首次打开：右键点击 → 「打开」（本地签名未公证，Gatekeeper 询问一次）
 3. 「系统设置 → 隐私与安全性 → 辅助功能」中开启 Pico
 4. 在支持无障碍的输入框打字实时翻译；微信等应用用「复制 + ⌥⇧V」
