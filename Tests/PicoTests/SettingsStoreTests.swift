@@ -41,7 +41,7 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(L10n.timingPause(.chinese), "超时翻译")
         XCTAssertEqual(L10n.timingCompleteSentence(.english), "Complete Sentence")
         XCTAssertEqual(L10n.timingShortcut(.chinese), "快捷键触发翻译")
-        XCTAssertEqual(L10n.translateShortcut(.english), "Translate Shortcut")
+        XCTAssertEqual(L10n.translateShortcut(.english), "Translation Shortcut")
         XCTAssertEqual(TranslationTiming.pause.displayName(for: .english), "On Pause")
         XCTAssertEqual(Language.chinese.speechLocaleIdentifier, "zh-CN")
         XCTAssertEqual(Language.english.speechLocaleIdentifier, "en-US")

@@ -67,7 +67,7 @@ enum L10n {
         lang == .chinese ? "辅助功能" : "Accessibility"
     }
     static func permissionGranted(_ lang: UILanguage) -> String {
-        lang == .chinese ? "✓ 已授权" : "✓ Authorized"
+        lang == .chinese ? "✓ 已授权" : "✓ Granted"
     }
     static func permissionHint(_ lang: UILanguage) -> String {
         lang == .chinese ? "需要辅助功能权限才能读取输入内容" : "Accessibility permission is required to read typed text"
@@ -131,7 +131,7 @@ enum L10n {
     static func thinkingAutomatic(_ lang: UILanguage) -> String { lang == .chinese ? "自动" : "Automatic" }
     static func thinkingOff(_ lang: UILanguage) -> String { lang == .chinese ? "非思考" : "Non-thinking" }
     static func thinkingOn(_ lang: UILanguage) -> String { lang == .chinese ? "思考" : "Thinking" }
-    static func failoverTimeout(_ lang: UILanguage) -> String { lang == .chinese ? "切换超时" : "Fail-over Timeout" }
+    static func failoverTimeout(_ lang: UILanguage) -> String { lang == .chinese ? "切换超时" : "Failover Timeout" }
     static func timeoutSeconds(_ lang: UILanguage, _ value: Int) -> String {
         lang == .chinese ? "超过 \(value) 秒切换" : "Switch after \(value) sec"
     }
@@ -203,7 +203,7 @@ enum L10n {
         lang == .chinese ? "历史记录仅保存在这台 Mac 上。" : "History is stored only on this Mac."
     }
     static func translateShortcut(_ lang: UILanguage) -> String {
-        lang == .chinese ? "翻译快捷键" : "Translate Shortcut"
+        lang == .chinese ? "翻译快捷键" : "Translation Shortcut"
     }
     static func speedFast(_ lang: UILanguage) -> String {
         lang == .chinese ? "快速" : "Fast"
@@ -336,7 +336,7 @@ enum L10n {
         lang == .chinese ? "文字大小" : "Text Size"
     }
     static func edgeDistance(_ lang: UILanguage) -> String {
-        lang == .chinese ? "距顶部距离" : "Edge Distance"
+        lang == .chinese ? "距顶部距离" : "Distance from Top"
     }
     static func newTranslationBehavior(_ lang: UILanguage) -> String {
         lang == .chinese ? "新翻译出现时" : "When a new translation appears"
@@ -518,7 +518,7 @@ enum L10n {
     static func updateAvailableBody(_ lang: UILanguage, _ version: String) -> String {
         lang == .chinese
             ? "Pico \(version) 已发布，要现在更新吗？\n下载完成后应用会自动重启完成安装。"
-            : "Pico \(version) is ready to install. Update now?\nThe app restarts automatically after downloading."
+            : "Pico \(version) is available. Update now?\nThe app downloads the update, then restarts to install."
     }
     static func updateNowButton(_ lang: UILanguage) -> String {
         lang == .chinese ? "立即更新" : "Update Now"
