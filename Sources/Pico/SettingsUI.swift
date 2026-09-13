@@ -1011,13 +1011,16 @@ struct SettingsView: View {
                     HStack(spacing: 8) {
                         Slider(
                             value: Binding(
-                                get: { settings.overlayOpacity },
+                                // 内部存的是不透明度（1=实心）；滑块按「透明度」
+                                // 呈现：越高越透。上限 0.7 对应系统钳制的最低
+                                // 不透明度 0.3，浮窗不能调成隐形
+                                get: { 1 - settings.overlayOpacity },
                                 set: {
-                                    settings.overlayOpacity = $0
-                                    state.overlay.cardOpacity = $0
-                                }), in: 0.3...1, step: 0.05)
+                                    settings.overlayOpacity = 1 - $0
+                                    state.overlay.cardOpacity = 1 - $0
+                                }), in: 0...0.7, step: 0.05)
                             .frame(width: 130)
-                        Text("\(Int((settings.overlayOpacity * 100).rounded()))%")
+                        Text("\((100 - Int((settings.overlayOpacity * 100).rounded())))%")
                             .monospacedDigit()
                             .frame(width: 44, alignment: .trailing)
                     }

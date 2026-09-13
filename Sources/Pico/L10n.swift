@@ -394,7 +394,7 @@ enum L10n {
     // MARK: - Overlay appearance
 
     static func overlayOpacity(_ lang: UILanguage) -> String {
-        lang == .chinese ? "悬浮窗透明度" : "Overlay Opacity"
+        lang == .chinese ? "悬浮窗透明度" : "Overlay Transparency"
     }
     static func overlayTheme(_ lang: UILanguage) -> String {
         lang == .chinese ? "主题色" : "Accent Color"
