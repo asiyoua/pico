@@ -26,18 +26,23 @@ xcrun actool \
   Resources/Assets.xcassets
 
 ENTITLEMENTS="$ROOT/Resources/Pico.entitlements"
-# Prefer the stable self-signed identity ("FloatTrans Dev") so the macOS
-# accessibility grant survives reinstalls; fall back to ad-hoc. An explicit
-# CODESIGN_IDENTITY always wins.
+# Prefer the stable self-signed identity ("Pico Dev"; "FloatTrans Dev" kept
+# as fallback from the app's previous name) so the macOS accessibility grant
+# survives reinstalls; fall back to ad-hoc. An explicit CODESIGN_IDENTITY
+# always wins.
 IDENTITY="${CODESIGN_IDENTITY:-}"
-if [[ -z "$IDENTITY" ]] && security find-identity -p codesigning -v 2>/dev/null | grep -qE '"(FloatTrans|Pico) Dev"'; then
-  IDENTITY="$(security find-identity -p codesigning -v 2>/dev/null | grep -oE '"(FloatTrans|Pico) Dev"' | head -1 | tr -d '"')"
+if [[ -z "$IDENTITY" ]]; then
+  FOUND="$(security find-identity -p codesigning -v 2>/dev/null)"
+  IDENTITY="$(grep -oE '"Pico Dev"' <<<"$FOUND" | head -1 | tr -d '"')"
+  if [[ -z "$IDENTITY" ]]; then
+    IDENTITY="$(grep -oE '"FloatTrans Dev"' <<<"$FOUND" | head -1 | tr -d '"')"
+  fi
 fi
 if [[ -n "$IDENTITY" ]]; then
   # --timestamp contacts Apple's timestamp server, which is unreachable from
   # some networks and hangs the build. The local self-signed identity does
   # not need a trusted timestamp: trust anchors on the certificate itself.
-  if [[ "$IDENTITY" == "FloatTrans Dev" ]]; then
+  if [[ "$IDENTITY" == "Pico Dev" || "$IDENTITY" == "FloatTrans Dev" ]]; then
     codesign --force --options runtime \
       --sign "$IDENTITY" \
       --entitlements "$ENTITLEMENTS" \
