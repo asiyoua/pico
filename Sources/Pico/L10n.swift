@@ -530,6 +530,29 @@ enum L10n {
         lang == .chinese ? "重试" : "Retry"
     }
 
+    // MARK: - Install location
+
+    static func installHealTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "把 Pico 移到「应用程序」文件夹" : "Move Pico to the Applications folder"
+    }
+    static func installHealBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "Pico 正在从临时位置运行（磁盘映像或下载文件夹），这样每次打开都要在「隐私与安全性」里手动同意，辅助功能授权也会反复失效。\n移到「应用程序」文件夹后，这些授权一次永久有效。"
+            : "Pico is running from a temporary location (a disk image or the Downloads folder). In this state macOS asks you to approve it under Privacy & Security on every launch, and the Accessibility grant keeps dropping.\nMove it to the Applications folder once and both approvals stick permanently."
+    }
+    static func installHealMoveButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "移到应用程序" : "Move to Applications"
+    }
+    static func installHealLaterButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "暂不" : "Not Now"
+    }
+    static func installHealMoving(_ lang: UILanguage) -> String {
+        lang == .chinese ? "正在移动，稍后自动重启…" : "Moving — restarting automatically…"
+    }
+    static func installHealFailed(_ lang: UILanguage) -> String {
+        lang == .chinese ? "移动失败" : "Move failed"
+    }
+
     // MARK: - History safety
 
     static func historyClear(_ lang: UILanguage) -> String {

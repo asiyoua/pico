@@ -95,6 +95,7 @@ struct MenuBarMenu: View {
     private var pendingAction: PendingTranslationAction?
     private var welcomeWindow: NSWindow?
     private var settingsWindow: NSWindow?
+    private var installHealWindow: NSWindow?
     private var permissionPoll: Task<Void, Never>?
     private var translationHostWindow: TranslationHostWindowController?
     init() {
@@ -202,6 +203,13 @@ struct MenuBarMenu: View {
                 try? await Task.sleep(for: .milliseconds(250))
                 DiagnosticLog.write("welcome task firing")
                 self?.presentWelcome()
+            }
+        }
+        // 从磁盘映像/下载文件夹运行时提示一键搬到「应用程序」，避免授权反复失效
+        if InstallHealer.shouldPrompt() {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(4.5))
+                self?.presentInstallHeal()
             }
         }
     }
@@ -338,6 +346,38 @@ struct MenuBarMenu: View {
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         welcomeWindow = window
+    }
+
+    /// 非阻塞安装位置提示窗。只用 orderFrontRegardless 展示、不抢键盘
+    /// 焦点（窗口曾被误按键触发默认按钮），并按主屏显式居中（macOS 26
+    /// 上 center() 会把窗放去屏外）。
+    private func presentInstallHeal() {
+        guard installHealWindow == nil else { return }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 210), styleMask: [.titled, .closable],
+            backing: .buffered, defer: false)
+        window.title = L10n.installHealTitle(settings.uiLanguage)
+        let controller = InstallHealController()
+        controller.onDismiss = { [weak self] in
+            self?.installHealWindow?.orderOut(nil)
+            self?.installHealWindow = nil
+        }
+        window.contentView = NSHostingView(
+            rootView: InstallHealView(controller: controller, lang: settings.uiLanguage)
+                .frame(width: 400, height: 182))
+        window.center()
+        if let screen = NSScreen.main ?? NSScreen.screens.first {
+            var frame = window.frame
+            frame.origin.x = screen.frame.midX - frame.width / 2
+            frame.origin.y = screen.frame.midY - frame.height / 2
+            window.setFrameOrigin(frame.origin)
+        }
+        window.isReleasedWhenClosed = false
+        // 浮在普通窗口之上但不抢键盘焦点；orderFrontRegardless 的默认 z 序
+        // 会被前台应用的窗口整个挡住
+        window.level = .floating
+        window.orderFrontRegardless()
+        installHealWindow = window
     }
     private func translate(
         _ text: String, sentenceKey: String, session: InputSessionID, screen: NSScreen?, snapshot: TextSnapshot
