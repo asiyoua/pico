@@ -26,35 +26,36 @@ xcrun actool \
   Resources/Assets.xcassets
 
 ENTITLEMENTS="$ROOT/Resources/Pico.entitlements"
-# Prefer the stable self-signed identity ("Pico Dev"; "FloatTrans Dev" kept
-# as fallback from the app's previous name) so the macOS accessibility grant
-# survives reinstalls; fall back to ad-hoc. An explicit CODESIGN_IDENTITY
-# always wins.
-IDENTITY="${CODESIGN_IDENTITY:-}"
-if [[ -z "$IDENTITY" ]]; then
-  FOUND="$(security find-identity -p codesigning -v 2>/dev/null)"
-  IDENTITY="$(grep -oE '"Pico Dev"' <<<"$FOUND" | head -1 | tr -d '"')"
-  if [[ -z "$IDENTITY" ]]; then
-    IDENTITY="$(grep -oE '"FloatTrans Dev"' <<<"$FOUND" | head -1 | tr -d '"')"
-  fi
+# The signing identity is a hard requirement: exactly "Pico Dev" (stable
+# self-signed cert so the macOS accessibility grant survives reinstalls).
+# If it is missing, fail loudly instead of signing with anything else — a
+# silently different signature would invalidate the TCC grant. Recreate the
+# cert per 开发问题与解决方案.md, or override with CODESIGN_IDENTITY=<name>.
+IDENTITY="${CODESIGN_IDENTITY:-Pico Dev}"
+FOUND="$(security find-identity -p codesigning -v 2>/dev/null || true)"
+if ! grep -qF "\"$IDENTITY\"" <<<"$FOUND"; then
+  {
+    echo "error: codesigning identity \"$IDENTITY\" not found or not valid."
+    echo "  Identities currently visible to security:"
+    echo "$FOUND" | sed 's/^/    /'
+    echo "  If the cert exists but is not listed, add trust:"
+    echo "    security add-trusted-cert -p codeSign -k ~/Library/Keychains/login.keychain-db <cert.pem>"
+  } >&2
+  exit 1
 fi
-if [[ -n "$IDENTITY" ]]; then
-  # --timestamp contacts Apple's timestamp server, which is unreachable from
-  # some networks and hangs the build. The local self-signed identity does
-  # not need a trusted timestamp: trust anchors on the certificate itself.
-  if [[ "$IDENTITY" == "Pico Dev" || "$IDENTITY" == "FloatTrans Dev" ]]; then
-    codesign --force --options runtime \
-      --sign "$IDENTITY" \
-      --entitlements "$ENTITLEMENTS" \
-      "$APP"
-  else
-    codesign --force --options runtime --timestamp \
-      --sign "$IDENTITY" \
-      --entitlements "$ENTITLEMENTS" \
-      "$APP"
-  fi
-  codesign --verify --deep --strict "$APP"
+# --timestamp contacts Apple's timestamp server, which is unreachable from
+# some networks and hangs the build. The local self-signed identity does
+# not need a trusted timestamp: trust anchors on the certificate itself.
+if [[ "$IDENTITY" == "Pico Dev" ]]; then
+  codesign --force --options runtime \
+    --sign "$IDENTITY" \
+    --entitlements "$ENTITLEMENTS" \
+    "$APP"
 else
-  codesign --force --sign - --entitlements "$ENTITLEMENTS" "$APP"
+  codesign --force --options runtime --timestamp \
+    --sign "$IDENTITY" \
+    --entitlements "$ENTITLEMENTS" \
+    "$APP"
 fi
-echo "Built $APP (signed with ${IDENTITY:-adhoc})"
+codesign --verify --deep --strict "$APP"
+echo "Built $APP (signed with $IDENTITY)"
