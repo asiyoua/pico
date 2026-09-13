@@ -491,6 +491,9 @@ enum L10n {
     static func autoUpdateToggle(_ lang: UILanguage) -> String {
         lang == .chinese ? "自动检查更新" : "Check for Updates Automatically"
     }
+    static func autoInstallToggle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "自动安装更新" : "Install Updates Automatically"
+    }
     static func autoUpdateStatus(_ lang: UILanguage) -> String {
         lang == .chinese ? "状态" : "Status"
     }
@@ -512,19 +515,32 @@ enum L10n {
     static func autoUpdateFailed(_ lang: UILanguage) -> String {
         lang == .chinese ? "更新失败" : "Update failed"
     }
-    static func updateAvailableTitle(_ lang: UILanguage) -> String {
-        lang == .chinese ? "发现 Pico 新版本" : "A new version of Pico is available"
+    static func updateWindowTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "Pico 更新" : "Pico Update"
     }
-    static func updateAvailableBody(_ lang: UILanguage, _ version: String) -> String {
-        lang == .chinese
-            ? "Pico \(version) 已发布，要现在更新吗？\n下载完成后应用会自动重启完成安装。"
-            : "Pico \(version) is available. Update now?\nThe app downloads the update, then restarts to install."
+    static func updateAutoRestartNote(_ lang: UILanguage) -> String {
+        lang == .chinese ? "下载完成后 Pico 会自动重启完成安装。" : "Pico restarts automatically to finish installing."
     }
-    static func updateNowButton(_ lang: UILanguage) -> String {
-        lang == .chinese ? "立即更新" : "Update Now"
+    static func updateAvailableHeading(_ lang: UILanguage, _ version: String) -> String {
+        lang == .chinese ? "Pico \(version) 可更新" : "Pico \(version) Is Available"
     }
-    static func updateLaterButton(_ lang: UILanguage) -> String {
-        lang == .chinese ? "暂不更新" : "Not Now"
+    static func updateCurrentLine(_ lang: UILanguage, _ version: String) -> String {
+        lang == .chinese ? "你当前使用的是 \(version)" : "You're currently on \(version)"
+    }
+    static func updateAutoInstallCheckbox(_ lang: UILanguage) -> String {
+        lang == .chinese ? "自动下载并安装以后的更新" : "Automatically download and install future updates"
+    }
+    static func updateNotesEmpty(_ lang: UILanguage) -> String {
+        lang == .chinese ? "这个版本没有写更新说明。" : "No notes were provided for this release."
+    }
+    static func updateSkipButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "跳过此版本" : "Skip This Version"
+    }
+    static func updateRemindButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "稍后提醒我" : "Remind Me Later"
+    }
+    static func updateInstallButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "安装更新" : "Install Update"
     }
     static func updateRetryButton(_ lang: UILanguage) -> String {
         lang == .chinese ? "重试" : "Retry"

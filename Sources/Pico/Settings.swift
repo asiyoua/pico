@@ -415,6 +415,17 @@ struct ReplaceShortcut: Equatable, Sendable {
             onAutoUpdateChanged?()
         }
     }
+    @Published var autoInstallUpdates: Bool {
+        didSet {
+            defaults.set(autoInstallUpdates, forKey: "autoInstallUpdates")
+        }
+    }
+    /// 更新弹窗「跳过此版本」记下的 tag；自动检查跳过它，手动检查不受限
+    @Published var updateSkippedTag: String? {
+        didSet {
+            defaults.set(updateSkippedTag ?? "", forKey: "updateSkippedTag")
+        }
+    }
     /// Assigned by AppState after its translation pipeline has been built.
     var onTranslationSettingsChanged: (() -> Void)?
     var onAutoUpdateChanged: (() -> Void)?
@@ -489,6 +500,10 @@ struct ReplaceShortcut: Equatable, Sendable {
             fallback: .controlShiftT)
         clipboardTranslationEnabled = defaults.object(forKey: "clipboardTranslationEnabled") as? Bool ?? false
         autoUpdateEnabled = defaults.object(forKey: "autoUpdateEnabled") as? Bool ?? true
+        autoInstallUpdates = defaults.object(forKey: "autoInstallUpdates") as? Bool ?? false
+        if let skipped = defaults.string(forKey: "updateSkippedTag"), !skipped.isEmpty {
+            updateSkippedTag = skipped
+        }
         clipboardTriggerMode =
             ClipboardTriggerMode(rawValue: defaults.string(forKey: "clipboardTriggerMode") ?? "") ?? .hotkey
         clipboardShortcut = Self.loadShortcut(

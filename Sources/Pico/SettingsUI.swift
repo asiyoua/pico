@@ -675,6 +675,9 @@ struct SettingsView: View {
                 SettingsRow(label: L10n.autoUpdateToggle(lang)) {
                     smallToggle($state.settings.autoUpdateEnabled)
                 }
+                SettingsRow(label: L10n.autoInstallToggle(lang)) {
+                    smallToggle($state.settings.autoInstallUpdates)
+                }
                 SettingsRow(label: L10n.autoUpdateStatus(lang), divider: false) {
                     Text(autoUpdateStatusText)
                         .font(.caption)
