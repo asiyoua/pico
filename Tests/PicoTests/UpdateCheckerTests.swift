@@ -138,6 +138,39 @@ final class UpdateCheckerTests: XCTestCase {
             .newer(URL(string: "https://github.com/asiyoua/pico/releases/tag/v0.2.0")!))
     }
 
+    // MARK: Trusted update hosts (download URLs come from release metadata)
+
+    func testSafeUpdateURLAcceptsGitHubHosts() {
+        XCTAssertEqual(
+            UpdateChecker.safeUpdateURL("https://github.com/asiyoua/pico/releases/download/v1.0.3/Pico-1.0.3.dmg")?
+                .host, "github.com")
+        XCTAssertEqual(
+            UpdateChecker.safeUpdateURL("https://objects.githubusercontent.com/x/Pico-1.0.3.dmg")?.host,
+            "objects.githubusercontent.com")
+        XCTAssertEqual(
+            UpdateChecker.safeUpdateURL("https://release-assets.githubusercontent.com/x")?.host,
+            "release-assets.githubusercontent.com")
+        XCTAssertEqual(UpdateChecker.safeUpdateURL("https://api.github.com/repos/asiyoua/pico/releases/latest")?
+            .host, "api.github.com")
+    }
+
+    func testSafeUpdateURLRejectsNonGitHubAndInsecureTargets() {
+        XCTAssertNil(UpdateChecker.safeUpdateURL("http://github.com/asiyoua/pico/releases/download/v1/Pico.dmg"))
+        XCTAssertNil(UpdateChecker.safeUpdateURL("https://evil.example.com/Pico.dmg"))
+        XCTAssertNil(UpdateChecker.safeUpdateURL("https://127.0.0.1/Pico.dmg"))
+        XCTAssertNil(UpdateChecker.safeUpdateURL("https://192.168.1.10/Pico.dmg"))
+        XCTAssertNil(UpdateChecker.safeUpdateURL("not a url"))
+        XCTAssertNil(UpdateChecker.safeUpdateURL(""))
+    }
+
+    func testTrustedHostRejectsLookalikes() {
+        XCTAssertFalse(UpdateChecker.isTrustedUpdateHost("github.com.evil.com"))
+        XCTAssertFalse(UpdateChecker.isTrustedUpdateHost("notgithub.com"))
+        XCTAssertFalse(UpdateChecker.isTrustedUpdateHost("githubusercontent.com.evil.com"))
+        XCTAssertTrue(UpdateChecker.isTrustedUpdateHost("raw.githubusercontent.com"))
+        XCTAssertFalse(UpdateChecker.isTrustedUpdateHost(nil))
+    }
+
     func testReleasePageFallbackUpToDate() async {
         let checker = UpdateChecker(currentVersion: "0.1.0") { request in
             if request.url == UpdateChecker.latestReleaseURL {

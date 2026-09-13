@@ -598,10 +598,7 @@ private struct PendingTranslationAction {
 
 struct AboutView: View {
     var language: UILanguage = .chinese
-    var checker = UpdateChecker()
-    var openURL: (URL) -> Void = { NSWorkspace.shared.open($0) }
-
-    @State private var checkStatus: UpdateCheckStatus = .idle
+    @ObservedObject var autoUpdater: AutoUpdateController
 
     var body: some View {
         VStack(spacing: 14) {
@@ -611,11 +608,12 @@ struct AboutView: View {
             Text(L10n.version(language)).foregroundStyle(.secondary)
             Text(L10n.aboutBody(language)).multilineTextAlignment(.center).foregroundStyle(.secondary)
             Button(L10n.checkForUpdates(language)) {
-                Task { await checkForUpdates() }
+                autoUpdater.checkManually()
             }
-            .disabled(checkStatus == .checking)
-            if let statusText {
+            .disabled(autoUpdater.isBusy)
+            if let statusText = autoUpdater.statusText(for: language) {
                 Text(statusText).font(.caption).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
             Divider()
             aboutLinkRow(
@@ -641,22 +639,6 @@ struct AboutView: View {
                 Link(title, destination: url).font(.caption)
             }
         }
-    }
-
-    private var statusText: String? {
-        switch checkStatus {
-        case .idle: return nil
-        case .checking: return L10n.checkForUpdatesChecking(language)
-        case .upToDate: return L10n.checkForUpdatesUpToDate(language)
-        case .failed: return L10n.checkForUpdatesFailed(language)
-        }
-    }
-
-    private func checkForUpdates() async {
-        checkStatus = .checking
-        let result = await checker.check()
-        if let url = result.urlToOpen { openURL(url) }
-        checkStatus = result.statusAfterCheck
     }
 }
 

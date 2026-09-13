@@ -558,22 +558,7 @@ struct SettingsView: View {
     private var lang: UILanguage { settings.uiLanguage }
 
     private var autoUpdateStatusText: String {
-        switch autoUpdater.phase {
-        case .idle:
-            return "—"
-        case .checking:
-            return L10n.autoUpdateChecking(lang)
-        case .upToDate:
-            return L10n.autoUpdateUpToDate(lang)
-        case .available(let version):
-            return L10n.autoUpdateAvailable(lang, version)
-        case .downloading(let progress):
-            return "\(L10n.autoUpdateDownloading(lang)) \(Int(progress * 100))%"
-        case .installing:
-            return L10n.autoUpdateInstalling(lang)
-        case .failed(let message):
-            return "\(L10n.autoUpdateFailed(lang))：\(message)"
-        }
+        autoUpdater.statusText(for: lang) ?? "—"
     }
 
     var body: some View {
@@ -1264,7 +1249,7 @@ struct SettingsView: View {
     // MARK: About
 
     private var aboutPage: some View {
-        AboutView(language: lang)
+        AboutView(language: lang, autoUpdater: state.autoUpdater)
             .frame(maxWidth: .infinity)
     }
 }

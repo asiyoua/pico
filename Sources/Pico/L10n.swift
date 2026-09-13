@@ -526,6 +526,9 @@ enum L10n {
     static func updateLaterButton(_ lang: UILanguage) -> String {
         lang == .chinese ? "暂不更新" : "Not Now"
     }
+    static func updateRetryButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "重试" : "Retry"
+    }
 
     // MARK: - History safety
 
