@@ -15,13 +15,58 @@ extension OverlayTheme {
     }
 }
 
+/// Decides whether a translation card fits on screen or needs to scroll.
+/// Pure so the threshold policy is unit-testable.
+enum OverlaySizing {
+    struct Plan: Equatable {
+        let scrolls: Bool
+        let textHeightLimit: CGFloat?
+        let cardHeight: CGFloat
+    }
+
+    /// Roughly the widest wrap width a card offers its body text: 600pt card
+    /// minus leading/trailing padding and a scrollbar allowance.
+    static let measuredTextWidth: CGFloat = 560
+
+    /// Exact wrapped text height via TextKit — deterministic regardless of
+    /// window state (NSHostingView.fittingSize collapses for scrollable or
+    /// unattached content). A few points of drift against SwiftUI's line
+    /// layout only matters at the scroll threshold, where either choice is
+    /// acceptable.
+    static func textHeight(text: String, fontSize: CGFloat, width: CGFloat) -> CGFloat {
+        guard !text.isEmpty else { return 0 }
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+        let storage = NSTextStorage(string: text, attributes: [.font: font])
+        let manager = NSLayoutManager()
+        storage.addLayoutManager(manager)
+        let container = NSTextContainer(size: NSSize(width: width, height: .greatestFiniteMagnitude))
+        container.widthTracksTextView = true
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        _ = manager.glyphRange(for: container)
+        return ceil(manager.usedRect(for: container).height)
+    }
+
+    static func plan(naturalCardHeight: CGFloat, maxCardHeight: CGFloat, chromeHeight: CGFloat) -> Plan {
+        guard naturalCardHeight > maxCardHeight, maxCardHeight > chromeHeight + 60 else {
+            return Plan(scrolls: false, textHeightLimit: nil, cardHeight: naturalCardHeight)
+        }
+        return Plan(
+            scrolls: true, textHeightLimit: maxCardHeight - chromeHeight, cardHeight: maxCardHeight)
+    }
+}
+
 struct TranslationOverlayView: View {
     let text: String
     let fontSize: CGFloat
     let theme: OverlayTheme
     let surface: OverlaySurfaceEffect
+    /// When set, body text scrolls inside this fixed height instead of growing
+    /// the card without bound (long clipboard translations).
+    let textHeightLimit: CGFloat?
     let onClose: () -> Void
     let onCopy: () -> Void
+    var onHoverChange: (Bool) -> Void = { _ in }
 
     @State private var closeHovered = false
     @State private var copyHovered = false
@@ -59,19 +104,14 @@ struct TranslationOverlayView: View {
                 .onHover { closeHovered = $0 }
                 .accessibilityLabel(Text("Close"))
             }
-            Text(text)
-                .font(.system(size: fontSize, weight: .medium))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.leading)
-                .lineLimit(nil)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            textBody
         }
         .padding(.leading, 16)
         .padding(.trailing, 12)
         .padding(.top, 10)
         .padding(.bottom, 13)
         .frame(minWidth: 340, maxWidth: 600)
+        .onHover { onHoverChange($0) }
         .background {
             surfaceShape
                 .overlay {
@@ -84,6 +124,22 @@ struct TranslationOverlayView: View {
         // The whole card is a move handle; window dragging is driven by the
         // window server via isMovableByWindowBackground (set on the panel), so
         // buttons above still win for plain clicks.
+    }
+
+    @ViewBuilder private var textBody: some View {
+        let bodyText = Text(text)
+            .font(.system(size: fontSize, weight: .medium))
+            .foregroundStyle(.primary)
+            .multilineTextAlignment(.leading)
+            .lineLimit(nil)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        if let limit = textHeightLimit {
+            ScrollView(.vertical) { bodyText }
+                .frame(height: limit)
+        } else {
+            bodyText
+        }
     }
 
     private func chipBackground(highlighted: Bool) -> some View {
@@ -116,6 +172,10 @@ struct TranslationOverlayView: View {
         let key: String
         let panel: NSPanel
         var text: String
+        var textHeightLimit: CGFloat?
+        /// Set when the card scrolls: the panel height is a fixed budget
+        /// instead of the (collapsed) fitting size of a scroll view.
+        var plannedCardHeight: CGFloat?
         weak var screen: NSScreen?
         var avoid: NSRect?
         var slot: OverlayPosition?
@@ -133,6 +193,11 @@ struct TranslationOverlayView: View {
             self.text = text
         }
     }
+
+    /// Debug/diagnostic hook: frames of the panels currently on screen.
+    var visiblePanelFrames: [NSRect] { entries.map { $0.panel.frame } }
+    /// Debug/diagnostic hook: ids of the entries currently on screen.
+    var shownEntryIDs: [UUID] { entries.map(\.id) }
 
     private var entries: [Entry] = []
     /// Top-left corner the next fresh overlay should use. Set when the user
@@ -177,7 +242,7 @@ struct TranslationOverlayView: View {
     func refreshAppearance() {
         for entry in entries {
             entry.panel.contentView = NSHostingView(
-                rootView: makeView(text: entry.text, id: entry.id, panel: entry.panel))
+                rootView: makeView(text: entry.text, textHeightLimit: entry.textHeightLimit, id: entry.id))
         }
         relayout()
     }
@@ -191,8 +256,7 @@ struct TranslationOverlayView: View {
             existing.text = text
             existing.screen = screen ?? existing.screen ?? NSScreen.main
             existing.avoid = avoid
-            existing.panel.contentView = NSHostingView(
-                rootView: makeView(text: text, id: existing.id, panel: existing.panel))
+            installContent(for: existing)
             // Restart the auto-hide timer so a refreshed sentence gets the
             // full display duration instead of vanishing on the old schedule.
             scheduleHide(for: existing)
@@ -215,7 +279,6 @@ struct TranslationOverlayView: View {
         panel.isMovableByWindowBackground = true
         panel.alphaValue = CGFloat(min(max(cardOpacity, 0.3), 1))
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.contentView = NSHostingView(rootView: makeView(text: text, id: id, panel: panel))
         let entry = Entry(id: id, key: key, panel: panel, screen: target, avoid: avoid, text: text)
         entry.moveObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didMoveNotification, object: panel, queue: .main
@@ -224,6 +287,7 @@ struct TranslationOverlayView: View {
             self.pin(id, topLeft: CGPoint(x: panel.frame.minX, y: panel.frame.maxY))
         }
         entries.append(entry)
+        installContent(for: entry)
         relayout()
         isApplyingProgrammaticFrame = true
         panel.orderFrontRegardless()
@@ -231,17 +295,87 @@ struct TranslationOverlayView: View {
         scheduleHide(for: entry)
     }
 
-    private func makeView(text: String, id: UUID, panel: NSPanel) -> TranslationOverlayView {
+    /// Sizes the card for the current text (scrolling when it would exceed the
+    /// screen budget) and installs it as the panel's content.
+    private func installContent(for entry: Entry) {
+        let chrome = chromeHeight()
+        let naturalText = OverlaySizing.textHeight(
+            text: entry.text, fontSize: textSize.points, width: OverlaySizing.measuredTextWidth)
+        let plan = OverlaySizing.plan(
+            naturalCardHeight: naturalText + chrome,
+            maxCardHeight: cardHeightLimit(on: entry.screen),
+            chromeHeight: chrome)
+        entry.textHeightLimit = plan.textHeightLimit
+        entry.plannedCardHeight = plan.scrolls ? plan.cardHeight : nil
+        entry.panel.contentView = NSHostingView(
+            rootView: makeView(text: entry.text, textHeightLimit: entry.textHeightLimit, id: entry.id))
+    }
+
+    /// Card height ceiling: roughly half the screen so long translations stay
+    /// readable instead of spilling past the display edge.
+    private func cardHeightLimit(on screen: NSScreen?) -> CGFloat {
+        let visible = screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 900
+        return min(460, max(240, visible * 0.55))
+    }
+
+    /// Header row + outer padding height, measured once with a zero-height
+    /// text area (layout constants, so it never needs invalidation).
+    private func chromeHeight() -> CGFloat {
+        if let cached = measuredChromeHeight { return cached }
+        let host = NSHostingView(
+            rootView: TranslationOverlayView(
+                text: "Xg", fontSize: 10, theme: theme, surface: surface, textHeightLimit: 0,
+                onClose: {}, onCopy: {}, onHoverChange: { _ in }))
+        measurePanel.contentView = host
+        host.layoutSubtreeIfNeeded()
+        measuredChromeHeight = host.fittingSize.height
+        measurePanel.contentView = nil
+        return measuredChromeHeight ?? 64
+    }
+    private var measuredChromeHeight: CGFloat?
+
+    private var measurePanel: NSPanel {
+        if let panel = measurePanelStorage { return panel }
+        let panel = NSPanel(
+            contentRect: NSRect(x: -20000, y: -20000, width: 600, height: 100),
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isOpaque = false
+        panel.backgroundColor = .clear
+        panel.alphaValue = 0
+        panel.ignoresMouseEvents = true
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.orderFrontRegardless()
+        measurePanelStorage = panel
+        return panel
+    }
+    private var measurePanelStorage: NSPanel?
+
+    private func makeView(text: String, textHeightLimit: CGFloat?, id: UUID) -> TranslationOverlayView {
         TranslationOverlayView(
             text: text,
             fontSize: textSize.points,
             theme: theme,
             surface: surface,
+            textHeightLimit: textHeightLimit,
             onClose: { [weak self] in self?.remove(id) },
             onCopy: { [weak self] in
                 TranslationClipboard.copy(text)
                 self?.onCopyToPasteboard?(text)
+            },
+            onHoverChange: { [weak self] hovering in
+                self?.setHovering(id, hovering)
             })
+    }
+
+    /// Pauses auto-hide while the cursor rests on the card so long
+    /// translations can be read (and scrolled) at leisure.
+    func setHovering(_ id: UUID, _ hovering: Bool) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        if hovering {
+            entry.hideTask?.cancel()
+        } else {
+            scheduleHide(for: entry)
+        }
     }
 
     /// Remembers a user-dragged panel and adopts its position as the spot for
@@ -287,7 +421,12 @@ struct TranslationOverlayView: View {
         var stackIndex = 0
         for entry in entries {
             entry.panel.contentView?.layoutSubtreeIfNeeded()
-            let size = entry.panel.contentView?.fittingSize ?? entry.panel.frame.size
+            let fitting = entry.panel.contentView?.fittingSize ?? entry.panel.frame.size
+            // A scrolling card's fitting height collapses to the scroll view's
+            // ideal; the planned budget is the real panel height there.
+            let size = NSSize(
+                width: fitting.width,
+                height: entry.plannedCardHeight ?? fitting.height)
             if entry.isPinned {
                 // Keep the user-chosen top-left corner; only grow downward if
                 // the refreshed text needs a different height.
