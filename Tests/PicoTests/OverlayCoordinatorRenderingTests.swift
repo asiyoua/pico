@@ -80,4 +80,29 @@ final class OverlayCoordinatorRenderingTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(1200))
         XCTAssertTrue(coordinator.shownEntryIDs.isEmpty)
     }
+
+    func testResizeGrowsCardWithTopEdgeFixed() throws {
+        coordinator.neverHide = true
+        let screen = try XCTUnwrap(NSScreen.main)
+        coordinator.show(Self.longChineseText(), key: "rz", on: screen)
+        let id = try XCTUnwrap(coordinator.shownEntryIDs.first)
+        let before = try XCTUnwrap(coordinator.visiblePanelFrames.first)
+        coordinator.settleResize(of: id, to: 620)
+        let after = try XCTUnwrap(coordinator.visiblePanelFrames.first)
+        XCTAssertGreaterThan(after.height, before.height)
+        XCTAssertEqual(after.maxY, before.maxY, accuracy: 2, "top edge must stay fixed")
+    }
+
+    func testResizeShrinksAndClampsToMinimum() throws {
+        coordinator.neverHide = true
+        coordinator.show(Self.longChineseText(), key: "rz2", on: NSScreen.main)
+        let id = try XCTUnwrap(coordinator.shownEntryIDs.first)
+        coordinator.settleResize(of: id, to: 10)
+        let after = try XCTUnwrap(coordinator.visiblePanelFrames.first)
+        XCTAssertGreaterThanOrEqual(after.height, 90)
+        // Sanity cap for non-UI callers; the drag handle clamps earlier.
+        coordinator.settleResize(of: id, to: 99_999)
+        let maxed = try XCTUnwrap(coordinator.visiblePanelFrames.first)
+        XCTAssertLessThanOrEqual(maxed.height, 4000 + 51 + 2)
+    }
 }

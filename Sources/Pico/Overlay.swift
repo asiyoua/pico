@@ -87,13 +87,29 @@ struct TranslationOverlayView: View {
     /// When set, body text scrolls inside this fixed height instead of growing
     /// the card without bound (long clipboard translations).
     let textHeightLimit: CGFloat?
+    /// Resize bounds for scrollable cards; the coordinator derives them from
+    /// the screen so a dragged-out handle stays on display.
+    var minBodyHeight: CGFloat = 90
+    var maxBodyHeight: CGFloat = .infinity
     let onClose: () -> Void
     let onCopy: () -> Void
     var onHoverChange: (Bool) -> Void = { _ in }
+    /// Live body-height updates while the user drags the bottom handle.
+    var onResize: (CGFloat) -> Void = { _ in }
+    /// Called when the handle is released so the coordinator can settle the
+    /// panel frame (top edge fixed) after SwiftUI has resized the content.
+    var onResizeEnd: (CGFloat) -> Void = { _ in }
 
     @State private var closeHovered = false
     @State private var copyHovered = false
     @State private var copied = false
+    @State private var handleHovered = false
+    @State private var handlePressed = false
+    /// Body height while the handle is being dragged; nil falls back to the
+    /// installed limit (also how double-click restores the default).
+    @State private var liveLimit: CGFloat?
+
+    private var effectiveLimit: CGFloat? { liveLimit ?? textHeightLimit }
 
     private let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
 
@@ -141,6 +157,9 @@ struct TranslationOverlayView: View {
         // the scroll area.
         .contentShape(Rectangle())
         .gesture(WindowDragGesture())
+        .overlay(alignment: .bottom) {
+            if textHeightLimit != nil { resizeHandle }
+        }
         .background {
             surfaceShape
                 .overlay {
@@ -163,12 +182,48 @@ struct TranslationOverlayView: View {
             .lineLimit(nil)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
-        if let limit = textHeightLimit {
+        if let limit = effectiveLimit {
             ScrollView(.vertical) { bodyText }
                 .frame(height: limit)
         } else {
             bodyText
         }
+    }
+
+    /// Bottom-edge grabber for scrollable cards: drag to grow/shrink the card
+    /// (top edge stays put), double-click to restore the default height.
+    private var resizeHandle: some View {
+        Capsule()
+            .fill(Color.secondary.opacity(handleHovered || handlePressed ? 0.75 : 0.35))
+            .frame(width: 44, height: 5)
+            .padding(.bottom, 3)
+            .frame(height: 18)
+            .contentShape(Rectangle())
+            .onHover { hovering in
+                handleHovered = hovering
+                if hovering { NSCursor.resizeUpDown.push() } else { NSCursor.pop() }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 1)
+                    .onChanged { value in
+                        let base = liveLimit ?? textHeightLimit ?? 0
+                        handlePressed = true
+                        let newHeight = min(
+                            max(base + value.translation.height, minBodyHeight), maxBodyHeight)
+                        if newHeight != liveLimit {
+                            liveLimit = newHeight
+                            onResize(newHeight)
+                        }
+                    }
+                    .onEnded { _ in
+                        handlePressed = false
+                        if let liveLimit { onResizeEnd(liveLimit) }
+                    }
+            )
+            .onTapGesture(count: 2) {
+                liveLimit = nil
+                if let limit = textHeightLimit { onResize(limit) }
+            }
     }
 
     private func chipBackground(highlighted: Bool) -> some View {
@@ -395,6 +450,9 @@ struct TranslationOverlayView: View {
             theme: theme,
             surface: surface,
             textHeightLimit: textHeightLimit,
+            minBodyHeight: 90,
+            maxBodyHeight: max(
+                90, (screenForEntry(id)?.visibleFrame.height ?? 900) - 120),
             onClose: { [weak self] in self?.remove(id) },
             onCopy: { [weak self] in
                 TranslationClipboard.copy(text)
@@ -402,7 +460,49 @@ struct TranslationOverlayView: View {
             },
             onHoverChange: { [weak self] hovering in
                 self?.setHovering(id, hovering)
+            },
+            onResize: { [weak self] bodyHeight in
+                self?.recordResize(of: id, to: bodyHeight)
+            },
+            onResizeEnd: { [weak self] bodyHeight in
+                self?.settleResize(of: id, to: bodyHeight)
             })
+    }
+
+    private func screenForEntry(_ id: UUID) -> NSScreen? {
+        entries.first(where: { $0.id == id })?.screen ?? NSScreen.main
+    }
+
+    /// Bottom-edge resize: grows/shrinks the card with the top edge fixed.
+    /// While dragging, SwiftUI grows the hosting view and the window along
+    /// with it (the cursor's physical screen limit naturally bounds the
+    /// drag), so the coordinator only records state; on release
+    /// `settleResize` pins the final frame with the top edge fixed and
+    /// marks the card user-placed.
+    private func recordResize(of id: UUID, to bodyHeight: CGFloat) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        let chrome = chromeHeight()
+        entry.textHeightLimit = bodyHeight
+        entry.plannedCardHeight = bodyHeight + chrome
+        entry.isPinned = true
+    }
+
+    /// Pins the final frame with the top edge fixed. The view already clamps
+    /// the drag to sane bounds (the cursor physically cannot leave the screen
+    /// mid-drag, so the bottom edge stays reachable); settling with the same
+    /// value avoids fighting the hosting view's content sizing.
+    func settleResize(of id: UUID, to bodyHeight: CGFloat) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        let chrome = chromeHeight()
+        let clamped = min(max(bodyHeight, 90), 4000)
+        entry.textHeightLimit = clamped
+        entry.plannedCardHeight = clamped + chrome
+        var frame = entry.panel.frame
+        frame.origin.y = frame.maxY - (clamped + chrome)
+        frame.size.height = clamped + chrome
+        isApplyingProgrammaticFrame = true
+        entry.panel.setFrame(frame, display: true)
+        isApplyingProgrammaticFrame = false
     }
 
     /// Pauses auto-hide while the cursor rests on the card so long
