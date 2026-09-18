@@ -112,8 +112,11 @@ struct TranslationOverlayView: View {
         .padding(.bottom, 13)
         .frame(minWidth: 340, maxWidth: 600)
         .onHover { onHoverChange($0) }
-        // Native window drag over the whole card; rides the window
-        // server path so dragging stays 1:1 even over the scroll area.
+        // Make layout whitespace (the header spacer) hit-testable so the
+        // drag gesture covers the whole card, then the native window drag:
+        // it rides the window server path so dragging stays 1:1 even over
+        // the scroll area.
+        .contentShape(Rectangle())
         .gesture(WindowDragGesture())
         .background {
             surfaceShape
