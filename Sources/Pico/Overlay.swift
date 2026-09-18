@@ -1,63 +1,6 @@
 import AppKit
 import SwiftUI
 
-/// Hosting view that keeps window-server background dragging alive even when
-/// the hit test lands on interactive SwiftUI bridges (a scroll view's bridge
-/// opts out and would otherwise swallow the drag).
-final class MovableHostingView<Content: View>: NSHostingView<Content> {
-    override var mouseDownCanMoveWindow: Bool { true }
-}
-
-/// Transparent layer over the scrollable text: pressing it starts a native
-/// window drag (`performDrag` rides the same window-server path as
-/// isMovableByWindowBackground, so the drag stays 1:1). Scroll-wheel events
-/// are routed explicitly to the enclosing NSScrollView (SwiftUI's ScrollView
-/// bridge) because they would otherwise die in this layer. The card's buttons
-/// live outside the scroll area so they behave as before.
-private struct WindowDragCatcher: NSViewRepresentable {
-    func makeNSView(context: Context) -> DragCatcherView { DragCatcherView() }
-    func updateNSView(_ nsView: DragCatcherView, context: Context) {}
-
-    final class DragCatcherView: NSView {
-        private var scrollTarget: NSScrollView?
-
-        override func mouseDown(with event: NSEvent) {
-            window?.performDrag(with: event)
-        }
-        override var mouseDownCanMoveWindow: Bool { true }
-        override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-
-        override func viewDidMoveToWindow() {
-            super.viewDidMoveToWindow()
-            scrollTarget = nil
-        }
-
-        override func scrollWheel(with event: NSEvent) {
-            if scrollTarget == nil {
-                // SwiftUI hoists .overlay views beside the scroll view under
-                // the hosting view, so the NSScrollView bridge is a sibling
-                // subtree, never an ancestor — search the whole tree.
-                var root: NSView? = superview
-                while let parent = root?.superview { root = parent }
-                var queue: [NSView] = root.map { [$0] } ?? []
-                while !queue.isEmpty, scrollTarget == nil {
-                    let view = queue.removeFirst()
-                    if let scroll = view as? NSScrollView {
-                        scrollTarget = scroll
-                    } else {
-                        queue.append(contentsOf: view.subviews)
-                    }
-                }
-            }
-            if let scrollTarget {
-                scrollTarget.scrollWheel(with: event)
-            } else {
-                super.scrollWheel(with: event)
-            }
-        }
-    }
-}
-
 /// Maps the persisted theme choice to concrete colors used by the overlay.
 extension OverlayTheme {
     var accentColor: Color {
@@ -169,7 +112,9 @@ struct TranslationOverlayView: View {
         .padding(.bottom, 13)
         .frame(minWidth: 340, maxWidth: 600)
         .onHover { onHoverChange($0) }
-        .background { WindowDragCatcher() }
+        // Native window drag over the whole card; rides the window
+        // server path so dragging stays 1:1 even over the scroll area.
+        .gesture(WindowDragGesture())
         .background {
             surfaceShape
                 .overlay {
@@ -194,11 +139,9 @@ struct TranslationOverlayView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         if let limit = textHeightLimit {
             ScrollView(.vertical) { bodyText }
-                .overlay { WindowDragCatcher() }
                 .frame(height: limit)
         } else {
             bodyText
-                .overlay { WindowDragCatcher() }
         }
     }
 
@@ -301,7 +244,7 @@ struct TranslationOverlayView: View {
     /// overlays that are already on screen.
     func refreshAppearance() {
         for entry in entries {
-            entry.panel.contentView = MovableHostingView(
+            entry.panel.contentView = NSHostingView(
                 rootView: makeView(text: entry.text, textHeightLimit: entry.textHeightLimit, id: entry.id))
         }
         relayout()
@@ -367,7 +310,7 @@ struct TranslationOverlayView: View {
             chromeHeight: chrome)
         entry.textHeightLimit = plan.textHeightLimit
         entry.plannedCardHeight = plan.scrolls ? plan.cardHeight : nil
-        entry.panel.contentView = MovableHostingView(
+        entry.panel.contentView = NSHostingView(
             rootView: makeView(text: entry.text, textHeightLimit: entry.textHeightLimit, id: entry.id))
     }
 
@@ -382,7 +325,7 @@ struct TranslationOverlayView: View {
     /// text area (layout constants, so it never needs invalidation).
     private func chromeHeight() -> CGFloat {
         if let cached = measuredChromeHeight { return cached }
-        let host = MovableHostingView(
+        let host = NSHostingView(
             rootView: TranslationOverlayView(
                 text: "Xg", fontSize: 10, theme: theme, surface: surface, textHeightLimit: 0,
                 onClose: {}, onCopy: {}, onHoverChange: { _ in }))
