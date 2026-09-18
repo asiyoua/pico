@@ -60,6 +60,33 @@ struct SettingsGroup<Content: View>: View {
     }
 }
 
+/// A text-only row for the tips group: bold-ish title with a secondary
+/// description, no trailing control.
+struct TipRow: View {
+    let title: String
+    let body_: String
+    var divider: Bool = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.callout.weight(.medium))
+            Text(body_)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(alignment: .bottom) {
+            if divider {
+                Divider().padding(.leading, 16)
+            }
+        }
+    }
+}
+
 /// Small helper for picker-style trailing controls with a fixed width.
 struct TrailingPicker<Selection: Hashable, Options: View>: View {
     var width: CGFloat = 180
@@ -1088,6 +1115,13 @@ struct SettingsView: View {
                             state.overlay.neverHide = $0
                         }))
                 }
+            }
+            SettingsGroup(title: L10n.groupTips(lang)) {
+                TipRow(title: L10n.tipResizeTitle(lang), body_: L10n.tipResizeBody(lang))
+                TipRow(title: L10n.tipResetTitle(lang), body_: L10n.tipResetBody(lang))
+                TipRow(title: L10n.tipMoveTitle(lang), body_: L10n.tipMoveBody(lang))
+                TipRow(title: L10n.tipHoverTitle(lang), body_: L10n.tipHoverBody(lang))
+                TipRow(title: L10n.tipScrollTitle(lang), body_: L10n.tipScrollBody(lang), divider: false)
             }
             Group {
                 Button(L10n.previewOverlay(lang)) { state.showOverlayTest() }

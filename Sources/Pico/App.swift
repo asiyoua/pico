@@ -323,13 +323,24 @@ struct MenuBarMenu: View {
         window.contentView = hosting
         window.contentMinSize = NSSize(width: 760, height: 520)
         window.setContentSize(NSSize(width: 840, height: 700))
-        window.center()
+        centerOnMainScreen(window)
         window.isReleasedWhenClosed = false
         window.orderFrontRegardless()
         window.makeKey()
         NSApp.activate(ignoringOtherApps: true)
         settingsWindow = window
     }
+    /// macOS 26: center() can land a window off-screen (seen on the overlay
+    /// prompt); pin the window to the main screen center explicitly.
+    private func centerOnMainScreen(_ window: NSWindow) {
+        window.center()
+        guard let screen = NSScreen.main else { return }
+        var frame = window.frame
+        frame.origin.x = screen.frame.midX - frame.width / 2
+        frame.origin.y = screen.frame.midY - frame.height / 2
+        window.setFrameOrigin(frame.origin)
+    }
+
     func updateSettingsWindowTitle() {
         settingsWindow?.title = L10n.settingsWindowTitle(settings.uiLanguage)
     }
@@ -341,7 +352,7 @@ struct MenuBarMenu: View {
             backing: .buffered, defer: false)
         window.title = "Welcome to Pico"
         window.contentView = NSHostingView(rootView: WelcomeView(state: self))
-        window.center()
+        centerOnMainScreen(window)
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)

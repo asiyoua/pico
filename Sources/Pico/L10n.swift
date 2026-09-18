@@ -354,6 +354,52 @@ enum L10n {
         lang == .chinese ? "预览悬浮窗" : "Preview Overlay"
     }
 
+    // MARK: 使用技巧（悬浮窗页）
+
+    static func groupTips(_ lang: UILanguage) -> String {
+        lang == .chinese ? "使用技巧" : "Tips"
+    }
+    static func tipResizeTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "调整长文卡片高度" : "Resize long cards"
+    }
+    static func tipResizeBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "长译文卡片底边有拖动把手，上下拖动即可调整高度"
+            : "Long cards have a handle on the bottom edge — drag it up or down."
+    }
+    static func tipResetTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "恢复默认高度" : "Restore default height"
+    }
+    static func tipResetBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "双击底边把手，卡片回到默认大小"
+            : "Double-click the handle to bring the card back to its default size."
+    }
+    static func tipMoveTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "移动卡片" : "Move a card"
+    }
+    static func tipMoveBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "按住卡片任意位置拖动即可移动，位置会被记住"
+            : "Drag anywhere on a card to move it; its spot is remembered."
+    }
+    static func tipHoverTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "从容阅读" : "Read without interruption"
+    }
+    static func tipHoverBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "鼠标停在卡片上时，自动隐藏会暂停"
+            : "Keeping the cursor on a card pauses auto-hide."
+    }
+    static func tipScrollTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "查看长译文" : "Scroll long translations"
+    }
+    static func tipScrollBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "长译文在卡片内滚动查看，滚轮或触控板均可"
+            : "Long translations scroll inside the card with a mouse wheel or trackpad."
+    }
+
     static func positionTopRight(_ lang: UILanguage) -> String {
         lang == .chinese ? "右上" : "Top Right"
     }
