@@ -24,9 +24,32 @@ enum OverlaySizing {
         let cardHeight: CGFloat
     }
 
-    /// Roughly the widest wrap width a card offers its body text: 600pt card
-    /// minus leading/trailing padding and a scrollbar allowance.
-    static let measuredTextWidth: CGFloat = 560
+    /// Width of the longest line when nothing wraps. Together with the card
+    /// width clamp (min 340, max 600) this mirrors how SwiftUI sizes the
+    /// card, so wrap counts below match the rendered layout.
+    static func textWidth(text: String, fontSize: CGFloat) -> CGFloat {
+        guard !text.isEmpty else { return 0 }
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .medium)
+        let storage = NSTextStorage(string: text, attributes: [.font: font])
+        let manager = NSLayoutManager()
+        storage.addLayoutManager(manager)
+        let container = NSTextContainer(
+            size: NSSize(width: CGFloat.greatestFiniteMagnitude, height: .greatestFiniteMagnitude))
+        container.widthTracksTextView = true
+        container.lineFragmentPadding = 0
+        manager.addTextContainer(container)
+        _ = manager.glyphRange(for: container)
+        return ceil(manager.usedRect(for: container).width)
+    }
+
+    /// Body-text width the card will actually offer: the card is clamped to
+    /// 340...600 and pads 16pt leading + 12pt trailing (keep in sync with the
+    /// paddings in `TranslationOverlayView.body`).
+    static func measuredContentWidth(text: String, fontSize: CGFloat) -> CGFloat {
+        let ideal = textWidth(text: text, fontSize: fontSize)
+        let card = min(600, max(340, ideal + 28))
+        return card - 28
+    }
 
     /// Exact wrapped text height via TextKit — deterministic regardless of
     /// window state (NSHostingView.fittingSize collapses for scrollable or
@@ -214,7 +237,15 @@ struct TranslationOverlayView: View {
     private var isApplyingProgrammaticFrame = false
     var hideAfter: Double = 4
     var neverHide = false
-    var textSize: OverlayTextSize = .medium
+    var textSize: OverlayTextSize = .medium {
+        didSet {
+            // Re-measure: font size changes both the rendered cards and the
+            // scroll threshold computed in installContent.
+            guard oldValue != textSize else { return }
+            for entry in entries { installContent(for: entry) }
+            relayout()
+        }
+    }
     /// Whole-window transparency applied via panel alpha so slider changes
     /// update live panels without rebuilding views.
     var cardOpacity: Double = 1 {
@@ -306,7 +337,8 @@ struct TranslationOverlayView: View {
     private func installContent(for entry: Entry) {
         let chrome = chromeHeight()
         let naturalText = OverlaySizing.textHeight(
-            text: entry.text, fontSize: textSize.points, width: OverlaySizing.measuredTextWidth)
+            text: entry.text, fontSize: textSize.points,
+            width: OverlaySizing.measuredContentWidth(text: entry.text, fontSize: textSize.points))
         let plan = OverlaySizing.plan(
             naturalCardHeight: naturalText + chrome,
             maxCardHeight: cardHeightLimit(on: entry.screen),

@@ -39,4 +39,21 @@ final class OverlaySizingTests: XCTestCase {
         XCTAssertNil(plan.textHeightLimit)
         XCTAssertEqual(plan.cardHeight, 900)
     }
+
+    func testMeasuredContentWidthClampsLikeTheCard() {
+        // Wide text: card clamps to 600, body gets 600 - 28 padding.
+        let wide = OverlaySizing.measuredContentWidth(
+            text: String(repeating: "word ", count: 300), fontSize: 13)
+        XCTAssertEqual(wide, 572)
+        // Tiny text: card sits at minWidth 340, body gets 340 - 28.
+        let short = OverlaySizing.measuredContentWidth(text: "hi", fontSize: 13)
+        XCTAssertEqual(short, 312)
+    }
+
+    func testTextWidthFollowsLongestLine() {
+        // Hard line breaks: the longest line sets the width, not the total.
+        let mixed = OverlaySizing.textWidth(text: "a\naaaaaaa\naa", fontSize: 13)
+        let single = OverlaySizing.textWidth(text: "aaaaaaa", fontSize: 13)
+        XCTAssertEqual(mixed, single, accuracy: 2)
+    }
 }
