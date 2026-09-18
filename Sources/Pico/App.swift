@@ -96,6 +96,8 @@ struct MenuBarMenu: View {
     private var welcomeWindow: NSWindow?
     private var settingsWindow: NSWindow?
     private var installHealWindow: NSWindow?
+    private var reauthWindow: NSWindow?
+    private var reauthDismissedThisSession = false
     private var permissionPoll: Task<Void, Never>?
     private var translationHostWindow: TranslationHostWindowController?
     init() {
@@ -165,6 +167,9 @@ struct MenuBarMenu: View {
             self?.speech.stop()
             Task { await self?.coordinator.cancel() }
         }
+        if permissionGranted {
+            UserDefaults.standard.set(true, forKey: "hadAccessibilityPermission")
+        }
         if permissionGranted && enabled {
             monitor.start()
             DiagnosticLog.write("accessibility monitor started")
@@ -179,6 +184,9 @@ struct MenuBarMenu: View {
                 guard !Task.isCancelled else { return }
                 if AXIsProcessTrusted() {
                     self.permissionGranted = true
+                    UserDefaults.standard.set(true, forKey: "hadAccessibilityPermission")
+                    self.reauthWindow?.orderOut(nil)
+                    self.reauthWindow = nil
                     self.monitor.start()
                     return
                 }
@@ -211,6 +219,11 @@ struct MenuBarMenu: View {
                 try? await Task.sleep(for: .seconds(4.5))
                 self?.presentInstallHeal()
             }
+        }
+        // 授权失效提醒：曾授权过、现在掉了的用户会在启动几秒后看到提示窗
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(5.5))
+            self?.maybePresentReauth()
         }
     }
     func startTranslationHost() {
@@ -482,6 +495,39 @@ struct MenuBarMenu: View {
         DiagnosticLog.write("speech speaking length=\(text.count)")
         speech.speak(text, language: settings.targetLanguage)
     }
+    /// 曾授权过辅助功能、如今掉了的用户：主动提示重开，避免打字翻译
+    /// 静默失效没人发现。新用户（从未授权）走欢迎窗，不弹这个。
+    func maybePresentReauth() {
+        guard enabled, !showWelcome, !reauthDismissedThisSession else { return }
+        guard !AXIsProcessTrusted() else {
+            UserDefaults.standard.set(true, forKey: "hadAccessibilityPermission")
+            return
+        }
+        guard UserDefaults.standard.bool(forKey: "hadAccessibilityPermission") else { return }
+        presentReauth()
+    }
+
+    private func presentReauth() {
+        guard reauthWindow == nil else { return }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 190), styleMask: [.titled, .closable],
+            backing: .buffered, defer: false)
+        window.title = L10n.reauthTitle(settings.uiLanguage)
+        let controller = ReauthController()
+        controller.onDismiss = { [weak self] in
+            self?.reauthWindow?.orderOut(nil)
+            self?.reauthWindow = nil
+        }
+        window.contentView = NSHostingView(
+            rootView: ReauthView(controller: controller, lang: settings.uiLanguage)
+                .frame(width: 400, height: 168))
+        centerOnMainScreen(window)
+        window.isReleasedWhenClosed = false
+        window.level = .floating
+        window.orderFrontRegardless()
+        reauthWindow = window
+    }
+
     func setReplaceOriginal(_ enabled: Bool) {
         settings.replaceOriginal = enabled
         refreshHotKeys()
@@ -645,6 +691,47 @@ private struct PendingTranslationAction {
     var sentenceKey: String
     var applyReplaceWhenReady = false
     var applyCopyWhenReady = false
+}
+
+import AppKit
+
+@MainActor final class ReauthController: ObservableObject {
+    var onDismiss: (() -> Void)?
+
+    func openSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
+        onDismiss?()
+    }
+
+    func later() {
+        onDismiss?()
+    }
+}
+
+struct ReauthView: View {
+    @ObservedObject var controller: ReauthController
+    let lang: UILanguage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L10n.reauthTitle(lang))
+                .font(.headline)
+            Text(L10n.reauthBody(lang))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack {
+                Spacer()
+                Button(L10n.reauthLater(lang)) { controller.later() }
+                Button(L10n.reauthOpenSettings(lang)) { controller.openSettings() }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+        .frame(width: 400)
+    }
 }
 
 struct AboutView: View {

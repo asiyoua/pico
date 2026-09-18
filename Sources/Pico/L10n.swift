@@ -356,6 +356,22 @@ enum L10n {
 
     // MARK: 使用技巧（悬浮窗页）
 
+    // MARK: 辅助功能授权失效提醒
+
+    static func reauthTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "需要重新授权辅助功能" : "Accessibility Permission Needed"
+    }
+    static func reauthBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "打字实时翻译需要辅助功能权限。系统更新或重新安装后，这个权限可能需要重新打开——去系统设置里重新勾选 Pico 即可恢复，设置与历史不受影响。"
+            : "Live translation needs the Accessibility permission. After a macOS update or a reinstall it may need to be re-enabled — turn Pico back on in System Settings and everything is restored. Settings and history are untouched."
+    }
+    static func reauthOpenSettings(_ lang: UILanguage) -> String {
+        lang == .chinese ? "打开系统设置" : "Open System Settings"
+    }
+    static func reauthLater(_ lang: UILanguage) -> String {
+        lang == .chinese ? "暂不" : "Not Now"
+    }
     static func groupTips(_ lang: UILanguage) -> String {
         lang == .chinese ? "使用技巧" : "Tips"
     }
