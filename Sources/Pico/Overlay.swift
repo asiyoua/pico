@@ -535,6 +535,8 @@ final class OverlayPanel: NSPanel {
         // 拖拽由卡片上的 WindowDragCatcher 逐事件驱动（setFrameOrigin，无
         // 系统边界栏，四向都允许推出屏幕外），不用窗口服务器背景拖拽
         panel.isMovableByWindowBackground = false
+        // 显式关闭「应用失活即隐藏」（NSPanel 默认依赖平台行为）
+        panel.hidesOnDeactivate = false
         panel.alphaValue = CGFloat(min(max(cardOpacity, 0.3), 1))
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         let entry = Entry(id: id, key: key, panel: panel, screen: target, avoid: avoid, text: text)
