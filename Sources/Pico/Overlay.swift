@@ -51,9 +51,10 @@ enum OverlaySizing {
         return card - 28
     }
 
-    /// Pulls a frame fully inside `bounds` (used to settle a card after a
-    /// native drag: the cursor stops at the screen edge while the card top may
-    /// hang off-screen). Pure so the settle math is unit-testable.
+    /// Pulls a frame fully inside `bounds` (used for auto-placed cards so a
+    /// fresh card never spawns partially off-screen, whatever the display).
+    /// Pure so the clamp math is unit-testable. User-dragged cards are NOT
+    /// clamped — 拖到哪儿就停在哪儿，允许故意推出屏幕外。
     static func clampedIntoVisible(_ frame: NSRect, in bounds: NSRect, margin: CGFloat = 8) -> NSRect {
         let x = min(
             max(frame.minX, bounds.minX + margin),
@@ -277,10 +278,6 @@ struct TranslationOverlayView: View {
         var avoid: NSRect?
         var slot: OverlayPosition?
         var isPinned = false
-        /// 用于区分「用户拖拽」与「首次布局的被动移动」：新卡出现时的
-        /// layout 变化也会触发一次 didMove，若光标恰好在屏幕上缘会被误判
-        /// 成「往顶上推」而强行贴顶。
-        let createdAt = Date()
         var usesAnchor = false
         var hideTask: Task<Void, Never>?
         /// Lets us detach the didMove observer when the entry goes away.
@@ -304,8 +301,6 @@ struct TranslationOverlayView: View {
     /// Top-left corner the next fresh overlay should use. Set when the user
     /// drags a panel; cleared when the configured position changes.
     private var anchor: CGPoint?
-    /// 拖拽结束判定（didMove 去抖）与落位节拍。
-    private var settleTask: Task<Void, Never>?
     /// True while we move panels ourselves (placement/relayout); didMove
     /// notifications arriving outside these windows are user drags.
     private var isApplyingProgrammaticFrame = false
@@ -425,8 +420,8 @@ struct TranslationOverlayView: View {
 
     /// Card height ceiling: roughly 60% of the visible screen so long
     /// translations stay readable instead of spilling past the display edge.
-    /// 小屏（13 寸 Air 可视高 ~750pt）按 0.55 只给 ~55%，阅读区太小，
-    /// 提到 0.6；大屏仍受 460 上限约束不受影响。
+    /// 小屏（13 寸 Air 可视高 ~750pt）按 0.55 阅读区太小，提到 0.6；
+    /// 大屏仍受 460 上限约束不受影响。
     private func cardHeightLimit(on screen: NSScreen?) -> CGFloat {
         let visible = screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 900
         return min(460, max(240, visible * 0.6))
@@ -537,74 +532,12 @@ struct TranslationOverlayView: View {
         }
     }
 
-    /// 拖拽结束的落位。原生拖拽跟随光标，而光标顶到屏幕上缘就物理停住，
-    /// 卡顶永远差着「抓握点到卡顶」的距离——外部用户实测「长卡拖不到最
-    /// 顶上，越短越上」的根因。因此松手时光标若已被顶到屏幕上缘 40pt 内
-    /// （＝用户在使劲往顶上推），把卡顶贴齐菜单栏下缘落位；其余情况卡片
-    /// 悬出屏幕则整体收回可视区。
-    /// 只落位一次，不做节拍复核：外部用户实测松手后紧接着再拖时，残留
-    /// 节拍会反复抢夺卡片（1.2 秒被强制移动三次），体感=拖不动。松手
-    /// 后若系统还有滞后动画，用户再拖一次即可重新落位。
-    func settleAfterDrag(of id: UUID) {
-        guard let entry = entries.first(where: { $0.id == id }) else { return }
-        let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
-        let pushedToTop = bounds.map { NSEvent.mouseLocation.y > $0.maxY - 40 } ?? false
-        if pushedToTop {
-            snapTop(of: id)
-        } else {
-            settleIntoView(of: id)
-        }
-    }
-
-    /// 把卡片顶边贴齐可视区上缘（含横向收置），并同步拖拽锚点。
-    private func snapTop(of id: UUID) {
-        guard let entry = entries.first(where: { $0.id == id }) else { return }
-        guard let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else { return }
-        let target = OverlaySizing.clampedIntoVisible(
-            NSRect(x: entry.panel.frame.minX, y: bounds.maxY - entry.panel.frame.height,
-                   width: entry.panel.frame.width, height: entry.panel.frame.height),
-            in: bounds)
-        guard entry.panel.frame != target else { return }
-        isApplyingProgrammaticFrame = true
-        entry.panel.setFrame(target, display: true)
-        isApplyingProgrammaticFrame = false
-        if entry.isPinned { anchor = CGPoint(x: target.minX, y: target.maxY) }
-        DiagnosticLog.write("overlay snapped to top origin=(\(target.minX), \(target.minY))")
-    }
-
-    /// 卡片悬出可视屏幕（顶部被裁、横向出屏）时整体收回可视区；已在屏内
-    /// 则不动。
-    func settleIntoView(of id: UUID) {
-        guard let entry = entries.first(where: { $0.id == id }) else { return }
-        guard let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else { return }
-        var f = entry.panel.frame
-        guard f != OverlaySizing.clampedIntoVisible(f, in: bounds) else { return }
-        f = OverlaySizing.clampedIntoVisible(f, in: bounds)
-        isApplyingProgrammaticFrame = true
-        entry.panel.setFrame(f, display: true)
-        isApplyingProgrammaticFrame = false
-        if entry.isPinned { anchor = CGPoint(x: f.minX, y: f.maxY) }
-        DiagnosticLog.write("overlay settled into view origin=(\(f.minX), \(f.minY))")
-    }
-
     /// Remembers a user-dragged panel and adopts its position as the spot for
     /// future overlays, so moving one out of the way keeps later ones clear.
     private func pin(_ id: UUID, topLeft: CGPoint) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
-        // 出生 1.5 秒内的被动移动不算拖拽：此时若光标恰好在屏幕上缘，
-        // 会被误判成「往顶上推」而把新弹出的卡片猛吸到顶上
-        guard Date().timeIntervalSince(entry.createdAt) > 1.5 else { return }
         entry.isPinned = true
         anchor = topLeft
-        // 原生拖拽没有可靠的「松手」回调（WindowDragGesture.onEnded 实测
-        // 不触发），而 didMove 在拖拽期间连续到达、松手即停——停止 300ms
-        // 视为拖拽结束，按光标位置落位。
-        settleTask?.cancel()
-        settleTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            self?.settleAfterDrag(of: id)
-        }
     }
 
     private func scheduleHide(for entry: Entry) {
@@ -639,7 +572,6 @@ struct TranslationOverlayView: View {
     private func relayout() {
         isApplyingProgrammaticFrame = true
         defer { isApplyingProgrammaticFrame = false }
-        let fallbackBounds = NSScreen.main?.visibleFrame
         var stackIndex = 0
         for entry in entries {
             entry.panel.contentView?.layoutSubtreeIfNeeded()
@@ -649,18 +581,21 @@ struct TranslationOverlayView: View {
             let size = NSSize(
                 width: fitting.width,
                 height: entry.plannedCardHeight ?? fitting.height)
-            let bounds = entry.screen?.visibleFrame ?? fallbackBounds
-            // 兼容性不变量：无论哪条路径摆放、什么尺寸的屏幕（外部用户
-            // 13.3 寸 Air 可视高仅 ~750pt），卡片最终都必须完整落在所在
-            // 屏幕的可视区内，杜绝出生/刷新后悬出屏幕。
+            let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+            // 用户拖过的卡片停在哪儿就在哪儿（允许故意推出屏幕外），刷新
+            // 文本时保持左上角不动；只有自动摆放的新卡才保证完整落在所在
+            // 屏幕可视区内（任何尺寸的显示器上都不许出生在屏外）。
             func place(_ frame: NSRect) {
-                let final: NSRect
-                if let bounds {
-                    final = OverlaySizing.clampedIntoVisible(frame, in: bounds)
+                if entry.isPinned || entry.usesAnchor, let bounds {
+                    entry.panel.setFrame(
+                        OverlaySizing.clampedIntoVisible(
+                            NSRect(x: frame.minX, y: frame.maxY - size.height,
+                                   width: size.width, height: size.height),
+                            in: bounds),
+                        display: true)
                 } else {
-                    final = frame
+                    entry.panel.setFrame(frame, display: true)
                 }
-                entry.panel.setFrame(final, display: true)
             }
             if entry.isPinned {
                 // Keep the user-chosen top-left corner; only grow downward if
