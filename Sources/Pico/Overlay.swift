@@ -112,10 +112,6 @@ struct TranslationOverlayView: View {
     /// Called when the handle is released so the coordinator can settle the
     /// panel frame (top edge fixed) after SwiftUI has resized the content.
     var onResizeEnd: (CGFloat) -> Void = { _ in }
-    /// Called when a whole-card native drag ends, so the coordinator can pull
-    /// the card back fully on-screen (the cursor stops at the screen edge
-    /// while the card top may hang off it).
-    var onDragEnded: () -> Void = {}
 
     @State private var closeHovered = false
     @State private var copyHovered = false
@@ -173,7 +169,7 @@ struct TranslationOverlayView: View {
         // it rides the window server path so dragging stays 1:1 even over
         // the scroll area.
         .contentShape(Rectangle())
-        .gesture(WindowDragGesture().onEnded { _ in onDragEnded() })
+        .gesture(WindowDragGesture())
         .overlay(alignment: .bottom) {
             if textHeightLimit != nil { resizeHandle }
         }
@@ -304,6 +300,8 @@ struct TranslationOverlayView: View {
     /// Top-left corner the next fresh overlay should use. Set when the user
     /// drags a panel; cleared when the configured position changes.
     private var anchor: CGPoint?
+    /// 拖拽结束判定（didMove 去抖）与落位节拍。
+    private var settleTask: Task<Void, Never>?
     /// True while we move panels ourselves (placement/relayout); didMove
     /// notifications arriving outside these windows are user drags.
     private var isApplyingProgrammaticFrame = false
@@ -483,9 +481,6 @@ struct TranslationOverlayView: View {
             },
             onResizeEnd: { [weak self] bodyHeight in
                 self?.settleResize(of: id, to: bodyHeight)
-            },
-            onDragEnded: { [weak self] in
-                self?.settleAfterDrag(of: id)
             })
     }
 
@@ -536,22 +531,47 @@ struct TranslationOverlayView: View {
         }
     }
 
-    /// 拖拽结束时把卡片整体收进可视屏幕：原生拖拽跟随光标，光标顶到屏幕
-    /// 上缘就停，卡片顶边会悬在屏外（卡越高、抓点越靠下，停得越低——
-    /// 外部用户实测「长卡拖不到顶、显示不全」的根因）。松手后分 150/400/
-    /// 700ms 三个节拍各收置一次：系统（平铺手势/边缘动画）可能在松手后
-    /// 继续挪动窗口，最后一拍必须落在它后面，终态完整贴住可视区。
+    /// 拖拽结束的落位。原生拖拽跟随光标，而光标顶到屏幕上缘就物理停住，
+    /// 卡顶永远差着「抓握点到卡顶」的距离——外部用户实测「长卡拖不到最
+    /// 顶上，越短越上」的根因。因此松手时光标若已被顶到屏幕上缘 40pt 内
+    /// （＝用户在使劲往顶上推），直接把卡顶贴齐菜单栏下缘落位；其余情况
+    /// 卡片悬出屏幕则整体收回可视区。之后 150/400/700ms 三个节拍复核，
+    /// 兜住系统平铺回弹等滞后动画，终态必然符合落位。
     func settleAfterDrag(of id: UUID) {
-        settleIntoView(of: id)
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+        let pushedToTop = bounds.map { NSEvent.mouseLocation.y > $0.maxY - 40 } ?? false
         Task { [weak self] in
-            for delay: Duration in [.milliseconds(150), .milliseconds(400), .milliseconds(700)] {
-                try? await Task.sleep(for: delay)
-                guard let self else { return }
-                self.settleIntoView(of: id)
+            for delay: Duration in [.zero, .milliseconds(150), .milliseconds(400), .milliseconds(700)] {
+                if delay > .zero { try? await Task.sleep(for: delay) }
+                guard !Task.isCancelled, let self, self.entries.contains(where: { $0.id == id }) else { return }
+                if pushedToTop {
+                    self.snapTop(of: id)
+                } else {
+                    self.settleIntoView(of: id)
+                }
             }
         }
     }
 
+    /// 把卡片顶边贴齐可视区上缘（含横向收置），并同步拖拽锚点。
+    private func snapTop(of id: UUID) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        guard let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else { return }
+        let target = OverlaySizing.clampedIntoVisible(
+            NSRect(x: entry.panel.frame.minX, y: bounds.maxY - entry.panel.frame.height,
+                   width: entry.panel.frame.width, height: entry.panel.frame.height),
+            in: bounds)
+        guard entry.panel.frame != target else { return }
+        isApplyingProgrammaticFrame = true
+        entry.panel.setFrame(target, display: true)
+        isApplyingProgrammaticFrame = false
+        if entry.isPinned { anchor = CGPoint(x: target.minX, y: target.maxY) }
+        DiagnosticLog.write("overlay snapped to top origin=(\(target.minX), \(target.minY))")
+    }
+
+    /// 卡片悬出可视屏幕（顶部被裁、横向出屏）时整体收回可视区；已在屏内
+    /// 则不动。
     func settleIntoView(of id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         guard let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else { return }
@@ -571,6 +591,15 @@ struct TranslationOverlayView: View {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         entry.isPinned = true
         anchor = topLeft
+        // 原生拖拽没有可靠的「松手」回调（WindowDragGesture.onEnded 实测
+        // 不触发），而 didMove 在拖拽期间连续到达、松手即停——停止 250ms
+        // 视为拖拽结束，按光标位置落位。
+        settleTask?.cancel()
+        settleTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            self?.settleAfterDrag(of: id)
+        }
     }
 
     private func scheduleHide(for entry: Entry) {
