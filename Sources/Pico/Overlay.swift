@@ -277,6 +277,10 @@ struct TranslationOverlayView: View {
         var avoid: NSRect?
         var slot: OverlayPosition?
         var isPinned = false
+        /// 用于区分「用户拖拽」与「首次布局的被动移动」：新卡出现时的
+        /// layout 变化也会触发一次 didMove，若光标恰好在屏幕上缘会被误判
+        /// 成「往顶上推」而强行贴顶。
+        let createdAt = Date()
         var usesAnchor = false
         var hideTask: Task<Void, Never>?
         /// Lets us detach the didMove observer when the entry goes away.
@@ -585,14 +589,17 @@ struct TranslationOverlayView: View {
     /// future overlays, so moving one out of the way keeps later ones clear.
     private func pin(_ id: UUID, topLeft: CGPoint) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
+        // 出生 1.5 秒内的被动移动不算拖拽：此时若光标恰好在屏幕上缘，
+        // 会被误判成「往顶上推」而把新弹出的卡片猛吸到顶上
+        guard Date().timeIntervalSince(entry.createdAt) > 1.5 else { return }
         entry.isPinned = true
         anchor = topLeft
         // 原生拖拽没有可靠的「松手」回调（WindowDragGesture.onEnded 实测
-        // 不触发），而 didMove 在拖拽期间连续到达、松手即停——停止 250ms
+        // 不触发），而 didMove 在拖拽期间连续到达、松手即停——停止 300ms
         // 视为拖拽结束，按光标位置落位。
         settleTask?.cancel()
         settleTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
+            try? await Task.sleep(for: .milliseconds(300))
             guard !Task.isCancelled else { return }
             self?.settleAfterDrag(of: id)
         }
