@@ -51,6 +51,19 @@ enum OverlaySizing {
         return card - 28
     }
 
+    /// Pulls a frame fully inside `bounds` (used to settle a card after a
+    /// native drag: the cursor stops at the screen edge while the card top may
+    /// hang off-screen). Pure so the settle math is unit-testable.
+    static func clampedIntoVisible(_ frame: NSRect, in bounds: NSRect, margin: CGFloat = 8) -> NSRect {
+        let x = min(
+            max(frame.minX, bounds.minX + margin),
+            max(bounds.minX + margin, bounds.maxX - frame.width - margin))
+        let y = min(
+            max(frame.minY, bounds.minY + margin),
+            max(bounds.minY + margin, bounds.maxY - frame.height - margin))
+        return NSRect(x: x, y: y, width: frame.width, height: frame.height)
+    }
+
     /// Exact wrapped text height via TextKit — deterministic regardless of
     /// window state (NSHostingView.fittingSize collapses for scrollable or
     /// unattached content). A few points of drift against SwiftUI's line
@@ -99,6 +112,10 @@ struct TranslationOverlayView: View {
     /// Called when the handle is released so the coordinator can settle the
     /// panel frame (top edge fixed) after SwiftUI has resized the content.
     var onResizeEnd: (CGFloat) -> Void = { _ in }
+    /// Called when a whole-card native drag ends, so the coordinator can pull
+    /// the card back fully on-screen (the cursor stops at the screen edge
+    /// while the card top may hang off it).
+    var onDragEnded: () -> Void = {}
 
     @State private var closeHovered = false
     @State private var copyHovered = false
@@ -156,7 +173,7 @@ struct TranslationOverlayView: View {
         // it rides the window server path so dragging stays 1:1 even over
         // the scroll area.
         .contentShape(Rectangle())
-        .gesture(WindowDragGesture())
+        .gesture(WindowDragGesture().onEnded { _ in onDragEnded() })
         .overlay(alignment: .bottom) {
             if textHeightLimit != nil { resizeHandle }
         }
@@ -466,6 +483,9 @@ struct TranslationOverlayView: View {
             },
             onResizeEnd: { [weak self] bodyHeight in
                 self?.settleResize(of: id, to: bodyHeight)
+            },
+            onDragEnded: { [weak self] in
+                self?.settleAfterDrag(of: id)
             })
     }
 
@@ -514,6 +534,35 @@ struct TranslationOverlayView: View {
         } else {
             scheduleHide(for: entry)
         }
+    }
+
+    /// 拖拽结束时把卡片整体收进可视屏幕：原生拖拽跟随光标，光标顶到屏幕
+    /// 上缘就停，卡片顶边会悬在屏外（卡越高、抓点越靠下，停得越低——
+    /// 外部用户实测「长卡拖不到顶、显示不全」的根因）。松手后分 150/400/
+    /// 700ms 三个节拍各收置一次：系统（平铺手势/边缘动画）可能在松手后
+    /// 继续挪动窗口，最后一拍必须落在它后面，终态完整贴住可视区。
+    func settleAfterDrag(of id: UUID) {
+        settleIntoView(of: id)
+        Task { [weak self] in
+            for delay: Duration in [.milliseconds(150), .milliseconds(400), .milliseconds(700)] {
+                try? await Task.sleep(for: delay)
+                guard let self else { return }
+                self.settleIntoView(of: id)
+            }
+        }
+    }
+
+    func settleIntoView(of id: UUID) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        guard let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame else { return }
+        var f = entry.panel.frame
+        guard f != OverlaySizing.clampedIntoVisible(f, in: bounds) else { return }
+        f = OverlaySizing.clampedIntoVisible(f, in: bounds)
+        isApplyingProgrammaticFrame = true
+        entry.panel.setFrame(f, display: true)
+        isApplyingProgrammaticFrame = false
+        if entry.isPinned { anchor = CGPoint(x: f.minX, y: f.maxY) }
+        DiagnosticLog.write("overlay settled into view origin=(\(f.minX), \(f.minY))")
     }
 
     /// Remembers a user-dragged panel and adopts its position as the spot for
