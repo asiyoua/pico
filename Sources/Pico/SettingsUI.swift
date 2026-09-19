@@ -1289,8 +1289,10 @@ struct SettingsView: View {
     // MARK: About
 
     private var aboutPage: some View {
-        AboutView(language: lang, autoUpdater: state.autoUpdater)
-            .frame(maxWidth: .infinity)
+        AboutView(language: lang, autoUpdater: state.autoUpdater, onGenerateReport: {
+            state.generateDiagnosticsReport()
+        })
+        .frame(maxWidth: .infinity)
     }
 }
 

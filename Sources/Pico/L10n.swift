@@ -372,6 +372,20 @@ enum L10n {
     static func reauthLater(_ lang: UILanguage) -> String {
         lang == .chinese ? "暂不" : "Not Now"
     }
+
+    // MARK: 报告问题（诊断报告）
+
+    static func diagnosticsTitle(_ lang: UILanguage) -> String {
+        lang == .chinese ? "报告问题" : "Report a Problem"
+    }
+    static func diagnosticsBody(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "遇到打字翻译没反应之类的问题，点下面的按钮生成一份诊断文件（保存在桌面并自动打开访达），里面是版本、系统、辅助功能权限状态、相关设置和最近的运行记录；不含翻译内容和 API 密钥。把文件发给作者就能帮忙排查。"
+            : "If something does not work (e.g. live typing translation), click the button below to generate a diagnostics file on your Desktop. It contains the app version, macOS info, Accessibility permission state, related settings and recent activity; no translated text and no API keys are included. Send the file to the author to help debug."
+    }
+    static func diagnosticsButton(_ lang: UILanguage) -> String {
+        lang == .chinese ? "生成诊断报告" : "Generate Diagnostics File"
+    }
     static func groupTips(_ lang: UILanguage) -> String {
         lang == .chinese ? "使用技巧" : "Tips"
     }

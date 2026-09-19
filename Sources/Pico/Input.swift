@@ -137,6 +137,8 @@ public struct InputSessionID: Hashable, Sendable {
     /// keystroke, which is noticeable against slow accessibility apps.
     private var focusedFieldFrame: NSRect?
     private(set) var isRunning = false
+    /// 最近一次前台的非 Pico 应用，是诊断探针的目标（设置窗打开时 Pico 自己才是前台应用）。
+    private(set) var lastExternalApp: (pid: pid_t, bundleID: String)?
     private var lastResolvedProbe = Date.distantPast
     func start() {
         guard AXIsProcessTrusted() else {
@@ -173,6 +175,9 @@ public struct InputSessionID: Hashable, Sendable {
         removeObserver()
         let pid = app.processIdentifier
         session = InputSessionID(pid: pid)
+        if app.bundleIdentifier != Bundle.main.bundleIdentifier {
+            lastExternalApp = (pid: pid, bundleID: app.bundleIdentifier ?? "unknown")
+        }
         DiagnosticLog.write("focused app pid=\(pid) bundle=\(app.bundleIdentifier ?? "unknown")")
         logger.info(
             "focused app pid=\(pid, privacy: .public) bundle=\(app.bundleIdentifier ?? "unknown", privacy: .public)")
@@ -296,6 +301,31 @@ public struct InputSessionID: Hashable, Sendable {
         guard !resolved.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         return (resolved, captured?.session ?? session, captured?.screen ?? NSScreen.main)
     }
+    /// 诊断探针：检查最近前台的非 Pico 应用现在能否读到文本元素。只报结论
+    /// 与角色名，绝不带走文本内容。这是「打字翻译没反应」类问题的第一线索：
+    /// 授权掉了什么都没得读；微信 4.1.5+/自绘应用则读不到文本元素。
+    func diagnosticProbe() -> String {
+        guard let target = lastExternalApp else { return "probe result=no_external_app_tracked" }
+        guard NSRunningApplication(processIdentifier: target.pid) != nil else {
+            return "probe target=\(target.bundleID) result=app_not_running"
+        }
+        let appElement = AXUIElementCreateApplication(target.pid)
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(
+            appElement, kAXFocusedUIElementAttribute as CFString, &value)
+        guard status == .success, let focusedElement = value else {
+            return "probe target=\(target.bundleID) result=no_focused_element status=\(status.rawValue)"
+        }
+        guard let textElement = resolveTextElement(from: focusedElement as! AXUIElement, depth: 5)
+        else {
+            return
+                "probe target=\(target.bundleID) result=no_text_element (app may not expose accessibility, e.g. WeChat 4.1.5+)"
+        }
+        var role: CFTypeRef?
+        _ = AXUIElementCopyAttributeValue(textElement, kAXRoleAttribute as CFString, &role)
+        return "probe target=\(target.bundleID) result=text_element_found role=\(role as? String ?? "unknown")"
+    }
+
     func readSnapshot() {
         // Chromium apps build their AX tree asynchronously after the nudge;
         // keep re-probing while no text element has been resolved yet.

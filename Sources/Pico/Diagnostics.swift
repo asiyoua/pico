@@ -9,6 +9,11 @@ import Foundation
 enum DiagnosticLog {
     private static let url = URL(fileURLWithPath: "/tmp/pico-debug.log")
     private static let maxBytes = 1_048_576
+    /// 内存日志环：无论调试开关与否都记录，供「生成诊断报告」一键导出。
+    /// 只待在本机内存里，用户主动导出报告时才随文件离开机器。
+    private static let bufferLock = NSLock()
+    private static let bufferCapacity = 400
+    nonisolated(unsafe) private static var buffer: [String] = []
     /// Fractional seconds keep the stage-by-stage latency measurable.
     /// ISO8601DateFormatter is thread-safe for formatting; the unsafe marker
     /// only satisfies shared-state checking.
@@ -19,9 +24,10 @@ enum DiagnosticLog {
     }()
 
     static func write(_ message: String) {
-        guard isEnabled() else { return }
         let line = "\(formatter.string(from: .now)) \(message)\n"
-        guard let data = line.data(using: .utf8) else { return }
+        remember(line)
+        guard isEnabled() else { return }
+        let data = Data(line.utf8)
         if shouldTruncate(), (try? FileManager.default.removeItem(at: url)) == nil {
             return
         }
@@ -35,6 +41,34 @@ enum DiagnosticLog {
         // /tmp is shared; keep the log readable by the current user only.
         try? FileManager.default.setAttributes(
             [.posixPermissions: 0o600], ofItemAtPath: url.path)
+    }
+
+    static func recentLines() -> [String] {
+        bufferLock.lock()
+        defer { bufferLock.unlock() }
+        return buffer
+    }
+
+    /// 调试文件是否存在（存在说明用户开过 PICO_DEBUG/debugLogEnabled）。
+    static func debugFileExists() -> Bool {
+        FileManager.default.fileExists(atPath: url.path)
+    }
+
+    /// 调试文件尾部若干行，供诊断报告附带；读不到就给空数组。
+    static func debugFileTail(maxLines: Int = 150) -> [String] {
+        guard let data = try? Data(contentsOf: url),
+            let text = String(data: data, encoding: .utf8)
+        else { return [] }
+        return Array(text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init).suffix(maxLines))
+    }
+
+    private static func remember(_ line: String) {
+        bufferLock.lock()
+        defer { bufferLock.unlock() }
+        buffer.append(line)
+        if buffer.count > bufferCapacity {
+            buffer.removeFirst(buffer.count - bufferCapacity)
+        }
     }
 
     private static func isEnabled() -> Bool {

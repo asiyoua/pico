@@ -310,6 +310,46 @@ struct MenuBarMenu: View {
         if permissionGranted { monitor.start() }
     }
     func showOverlayTest() { overlay.show("This is a position preview.", on: NSScreen.main) }
+
+    /// 「报告问题」：一键在本机生成脱敏诊断文件（桌面），并在访达中显示。
+    /// 不做任何网络上传，文件由用户亲手发给作者。
+    func generateDiagnosticsReport() {
+        let snapshot = DiagnosticsSnapshot(
+            appVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown",
+            appBuild: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown",
+            bundleID: Bundle.main.bundleIdentifier ?? "unknown",
+            installPath: Bundle.main.bundlePath,
+            installNeedsHealing: InstallHealer.needsHealing(bundlePath: Bundle.main.bundlePath),
+            osVersion: DiagnosticsReport.osVersion(),
+            hardwareModel: DiagnosticsReport.hardwareModel(),
+            machine: DiagnosticsReport.machine(),
+            accessibilityTrusted: AXIsProcessTrusted(),
+            monitorRunning: monitor.isRunning,
+            probeLine: monitor.diagnosticProbe(),
+            weChatVersion: DiagnosticsReport.weChatVersion(),
+            enabled: enabled,
+            timingRaw: settings.translationTiming.rawValue,
+            speedMilliseconds: settings.translationSpeed,
+            sourceLanguage: settings.sourceLanguage.rawValue,
+            targetLanguage: settings.targetLanguage.rawValue,
+            backendRaw: settings.translationBackend.rawValue,
+            llmModelCount: settings.llmModels.count,
+            uiLanguage: settings.uiLanguage.rawValue,
+            clipboardEnabled: settings.clipboardTranslationEnabled,
+            clipboardTriggerRaw: settings.clipboardTriggerMode.rawValue,
+            excludedBundleIDs: settings.excludedBundleIDs.sorted(),
+            generatedAt: Date())
+        let content = DiagnosticsReport.render(
+            snapshot: snapshot, recentLog: DiagnosticLog.recentLines(),
+            debugLogExists: DiagnosticLog.debugFileExists(),
+            debugLogTail: DiagnosticLog.debugFileTail())
+        guard let url = DiagnosticsReport.write(content) else {
+            DiagnosticLog.write("diagnostics report write failed")
+            return
+        }
+        DiagnosticLog.write("diagnostics report written \(url.lastPathComponent)")
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
     func finishOnboarding() {
         UserDefaults.standard.set(true, forKey: "onboardingComplete")
         showWelcome = false
@@ -766,6 +806,7 @@ struct ReauthView: View {
 struct AboutView: View {
     var language: UILanguage = .chinese
     @ObservedObject var autoUpdater: AutoUpdateController
+    var onGenerateReport: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 14) {
@@ -791,6 +832,16 @@ struct AboutView: View {
                 label: L10n.aboutContactAuthor(language),
                 title: "xinzhu400@gmail.com",
                 urlString: "mailto:xinzhu400@gmail.com")
+            Divider()
+            VStack(alignment: .leading, spacing: 8) {
+                Text(L10n.diagnosticsTitle(language)).font(.headline)
+                Text(L10n.diagnosticsBody(language))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Button(L10n.diagnosticsButton(language)) { onGenerateReport() }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(28)
         .frame(maxWidth: 420)
