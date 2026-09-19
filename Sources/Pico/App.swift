@@ -98,7 +98,7 @@ struct MenuBarMenu: View {
     private var installHealWindow: NSWindow?
     private var reauthWindow: NSWindow?
     private var reauthDismissedThisSession = false
-    private var permissionPoll: Task<Void, Never>?
+    private let permissionWatchdog = AccessibilityPermissionWatchdog()
     private var translationHostWindow: TranslationHostWindowController?
     init() {
         let store = SettingsStore()
@@ -175,26 +175,26 @@ struct MenuBarMenu: View {
             DiagnosticLog.write("accessibility monitor skipped")
             logger.info("accessibility monitor skipped")
         }
-        // 授权状态常驻观察（1s 一次，代价可忽略）：false→true 时更新状态、
-        // 收起提醒窗并拉起监控；true→false 只更新状态——会话中不弹窗，
-        // 下次启动或打开主开关才提醒。老版轮询在授权恢复后即退出，会话中
-        // 授权再死（系统设置里被手动关掉、策略重置）就无人盯梢，重勾后
-        // 监控不会重启，要重启应用才恢复——本循环修复该缺口。
-        permissionPoll = Task { @MainActor [weak self] in
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1))
-                guard let self, !Task.isCancelled else { return }
-                let trusted = AXIsProcessTrusted()
-                guard trusted != self.permissionGranted else { continue }
-                self.permissionGranted = trusted
-                guard trusted else { continue }
-                DiagnosticLog.write("accessibility permission restored, starting monitor")
-                logger.info("accessibility permission restored, starting monitor")
-                self.reauthWindow?.orderOut(nil)
-                self.reauthWindow = nil
-                self.monitor.start()
-            }
+        // 常驻授权观察器：状态跃迁时回调。restored=更新状态、收起提醒窗、
+        // 拉起监控；lost=只更新状态（会话中不弹窗，下次启动或打开主开关
+        // 才提醒）。会话中授权再死（系统设置里被手动关掉、策略重置）也能
+        // 在重勾后自动恢复——老版轮询恢复后即退出，存在这个缺口。
+        permissionWatchdog.onRestored = { [weak self] in
+            guard let self else { return }
+            permissionGranted = true
+            reauthWindow?.orderOut(nil)
+            reauthWindow = nil
+            monitor.start()
+            DiagnosticLog.write("accessibility permission restored, starting monitor")
+            logger.info("accessibility permission restored, starting monitor")
         }
+        permissionWatchdog.onLost = { [weak self] in
+            guard let self else { return }
+            permissionGranted = false
+            DiagnosticLog.write("accessibility permission lost")
+            logger.info("accessibility permission lost")
+        }
+        permissionWatchdog.start()
         hotKey.onAction = { [weak self] action in
             switch action {
             case .replace: self?.handleReplaceHotKey()
@@ -743,7 +743,7 @@ struct MenuBarMenu: View {
     }
 
     deinit {
-        permissionPoll?.cancel()
+        // 授权观察器的 Task 持弱引用，应用退出时随 self 释放自行结束
         let watcher = pasteboardWatcher
         Task { @MainActor in watcher.stop() }
     }
@@ -1023,13 +1023,5 @@ struct TranslationHostView: View {
         panel.contentView = NSHostingView(rootView: TranslationHostView(holder: holder, settings: settings))
         panel.orderFrontRegardless()
         window = panel
-    }
-}
-
-@MainActor final class AccessibilityPermissionManager {
-    var isGranted: Bool { AXIsProcessTrusted() }
-    func request() {
-        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
     }
 }
