@@ -2,6 +2,113 @@ import AppKit
 import SwiftUI
 
 /// Maps the persisted theme choice to concrete colors used by the overlay.
+/// 全卡覆盖的透明拖拽层：手动逐事件驱动窗口移动（setFrameOrigin，无系统
+/// 边界栏），四向都允许推出屏幕外——卡片拖到哪儿就停在哪儿。头部按钮区
+/// 与底边缩放把手在 hitTest 里穿透给下层 SwiftUI 控件；滚轮显式转发给
+/// 正文滚动区（否则事件会死在本层）；悬停经 NSTrackingArea 上报，用于
+/// 悬停暂停自动隐藏。
+private struct WindowDragCatcherRepresentable: NSViewRepresentable {
+    var onHoverChange: (Bool) -> Void
+    var excludesHandle: Bool
+
+    func makeNSView(context: Context) -> WindowDragCatcherView {
+        let view = WindowDragCatcherView()
+        view.onHoverChange = onHoverChange
+        view.excludesHandle = excludesHandle
+        return view
+    }
+
+    func updateNSView(_ nsView: WindowDragCatcherView, context: Context) {
+        nsView.onHoverChange = onHoverChange
+        nsView.excludesHandle = excludesHandle
+    }
+}
+
+final class WindowDragCatcherView: NSView {
+    var onHoverChange: (Bool) -> Void = { _ in }
+    var excludesHandle = false
+    private var startMouse: CGPoint?
+    private var startOrigin: CGPoint?
+    private var scrollTarget: NSScrollView?
+    private var trackingArea: NSTrackingArea?
+
+    override func mouseDown(with event: NSEvent) {
+        startMouse = NSEvent.mouseLocation
+        startOrigin = window?.frame.origin
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let startMouse, let startOrigin, let window else { return }
+        let now = NSEvent.mouseLocation
+        // 无边界栏：跟随光标增量移动，四向都允许推出屏幕外
+        window.setFrameOrigin(
+            CGPoint(x: startOrigin.x + (now.x - startMouse.x),
+                    y: startOrigin.y + (now.y - startMouse.y)))
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        startMouse = nil
+        startOrigin = nil
+    }
+
+    // 面板的 isMovableByWindowBackground 会让窗口服务器接管拖拽并在屏幕
+    // 顶缘设栏，拖拽改由本层驱动后必须关闭
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    // 头部按钮区（复制/关闭）与底边缩放把手穿透给下层控件
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        let width = bounds.width, height = bounds.height
+        if local.x >= width - 70, local.y >= height - 36 { return nil }
+        if excludesHandle,
+            local.x >= width / 2 - 40, local.x <= width / 2 + 40,
+            local.y <= 26 {
+            return nil
+        }
+        return self
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea { removeTrackingArea(trackingArea) }
+        let area = NSTrackingArea(
+            rect: bounds,
+            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            owner: self)
+        addTrackingArea(area)
+        trackingArea = area
+    }
+
+    override func mouseEntered(with event: NSEvent) { onHoverChange(true) }
+    override func mouseExited(with event: NSEvent) { onHoverChange(false) }
+
+    override func scrollWheel(with event: NSEvent) {
+        if scrollTarget == nil {
+            // SwiftUI hoists .overlay views beside the scroll view under
+            // the hosting view, so the NSScrollView bridge is a sibling
+            // subtree, never an ancestor — search the whole tree.
+            var root: NSView? = superview
+            while let parent = root?.superview { root = parent }
+            var queue: [NSView] = root.map { [$0] } ?? []
+            while !queue.isEmpty, scrollTarget == nil {
+                let view = queue.removeFirst()
+                if let scroll = view as? NSScrollView {
+                    scrollTarget = scroll
+                } else {
+                    queue.append(contentsOf: view.subviews)
+                }
+            }
+        }
+        if let scrollTarget {
+            scrollTarget.scrollWheel(with: event)
+        } else {
+            super.scrollWheel(with: event)
+        }
+    }
+}
+
+/// Maps the persisted theme choice to concrete colors used by the overlay.
 extension OverlayTheme {
     var accentColor: Color {
         switch self {
@@ -164,13 +271,9 @@ struct TranslationOverlayView: View {
         .padding(.top, 10)
         .padding(.bottom, 13)
         .frame(minWidth: 340, maxWidth: 600)
-        .onHover { onHoverChange($0) }
-        // Make layout whitespace (the header spacer) hit-testable so the
-        // drag gesture covers the whole card, then the native window drag:
-        // it rides the window server path so dragging stays 1:1 even over
-        // the scroll area.
-        .contentShape(Rectangle())
-        .gesture(WindowDragGesture())
+        .overlay { WindowDragCatcherRepresentable(
+            onHoverChange: onHoverChange,
+            excludesHandle: textHeightLimit != nil) }
         .overlay(alignment: .bottom) {
             if textHeightLimit != nil { resizeHandle }
         }
@@ -189,12 +292,11 @@ struct TranslationOverlayView: View {
     }
 
     @ViewBuilder private var textBody: some View {
-        let bodyText = Text(text)
-            .font(.system(size: fontSize, weight: .medium))
-            .foregroundStyle(.primary)
+        let bodyText = MarkdownCardBodyView(
+            text: text,
+            fontSize: fontSize,
+            accentColor: theme.accentColor)
             .multilineTextAlignment(.leading)
-            .lineLimit(nil)
-            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
         if let limit = effectiveLimit {
             ScrollView(.vertical) { bodyText }
@@ -380,9 +482,9 @@ struct TranslationOverlayView: View {
         panel.backgroundColor = .clear
         panel.level = .floating
         panel.ignoresMouseEvents = false
-        // Window-server-driven dragging: the move tracks the cursor 1:1
-        // without a per-event round trip through the main thread.
-        panel.isMovableByWindowBackground = true
+        // 拖拽由卡片上的 WindowDragCatcher 逐事件驱动（setFrameOrigin，无
+        // 系统边界栏，四向都允许推出屏幕外），不用窗口服务器背景拖拽
+        panel.isMovableByWindowBackground = false
         panel.alphaValue = CGFloat(min(max(cardOpacity, 0.3), 1))
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         let entry = Entry(id: id, key: key, panel: panel, screen: target, avoid: avoid, text: text)
