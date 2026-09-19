@@ -806,7 +806,6 @@ struct ReauthView: View {
 struct AboutView: View {
     var language: UILanguage = .chinese
     @ObservedObject var autoUpdater: AutoUpdateController
-    var onGenerateReport: () -> Void = {}
 
     var body: some View {
         VStack(spacing: 14) {
@@ -832,16 +831,6 @@ struct AboutView: View {
                 label: L10n.aboutContactAuthor(language),
                 title: "xinzhu400@gmail.com",
                 urlString: "mailto:xinzhu400@gmail.com")
-            Divider()
-            VStack(alignment: .leading, spacing: 8) {
-                Text(L10n.diagnosticsTitle(language)).font(.headline)
-                Text(L10n.diagnosticsBody(language))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Button(L10n.diagnosticsButton(language)) { onGenerateReport() }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(28)
         .frame(maxWidth: 420)

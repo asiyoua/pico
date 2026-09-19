@@ -730,6 +730,14 @@ struct SettingsView: View {
                     }
                 }
             }
+            SettingsGroup(title: L10n.diagnosticsTitle(lang)) {
+                SettingsRow(
+                    label: L10n.diagnosticsRowLabel(lang),
+                    subtitle: L10n.diagnosticsBody(lang), divider: false
+                ) {
+                    Button(L10n.diagnosticsButton(lang)) { state.generateDiagnosticsReport() }
+                }
+            }
         }
     }
 
@@ -1289,10 +1297,8 @@ struct SettingsView: View {
     // MARK: About
 
     private var aboutPage: some View {
-        AboutView(language: lang, autoUpdater: state.autoUpdater, onGenerateReport: {
-            state.generateDiagnosticsReport()
-        })
-        .frame(maxWidth: .infinity)
+        AboutView(language: lang, autoUpdater: state.autoUpdater)
+            .frame(maxWidth: .infinity)
     }
 }
 
