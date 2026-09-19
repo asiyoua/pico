@@ -6,27 +6,32 @@ import SwiftUI
 /// 边界栏），四向都允许推出屏幕外——卡片拖到哪儿就停在哪儿。头部按钮区
 /// 与底边缩放把手在 hitTest 里穿透给下层 SwiftUI 控件；滚轮显式转发给
 /// 正文滚动区（否则事件会死在本层）；悬停经 NSTrackingArea 上报，用于
-/// 悬停暂停自动隐藏。
+/// 悬停暂停自动隐藏与钉住按钮的浮现。
 private struct WindowDragCatcherRepresentable: NSViewRepresentable {
     var onHoverChange: (Bool) -> Void
     var excludesHandle: Bool
+    /// 钉住按钮当前是否可见（悬停或已钉住）：可见时头部命中区让位三键
+    var pinChipVisible: Bool
 
     func makeNSView(context: Context) -> WindowDragCatcherView {
         let view = WindowDragCatcherView()
         view.onHoverChange = onHoverChange
         view.excludesHandle = excludesHandle
+        view.pinChipVisible = pinChipVisible
         return view
     }
 
     func updateNSView(_ nsView: WindowDragCatcherView, context: Context) {
         nsView.onHoverChange = onHoverChange
         nsView.excludesHandle = excludesHandle
+        nsView.pinChipVisible = pinChipVisible
     }
 }
 
 final class WindowDragCatcherView: NSView {
     var onHoverChange: (Bool) -> Void = { _ in }
     var excludesHandle = false
+    var pinChipVisible = false
     private var startMouse: CGPoint?
     private var startOrigin: CGPoint?
     private var scrollTarget: NSScrollView?
@@ -56,11 +61,14 @@ final class WindowDragCatcherView: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    // 头部按钮区（复制/关闭）与底边缩放把手穿透给下层控件
+    // 头部按钮区（复制/关闭/钉住）与底边缩放把手穿透给下层控件
     override func hitTest(_ point: NSPoint) -> NSView? {
         let local = convert(point, from: superview)
         let width = bounds.width, height = bounds.height
-        if local.x >= width - 70, local.y >= height - 36 { return nil }
+        // 三键（钉住/复制/关闭）都在右上：悬停浮现钉住键后让位 104pt，
+        // 平时只让位复制/关闭的 70pt
+        let chipsWidth: CGFloat = pinChipVisible ? 104 : 70
+        if local.x >= width - chipsWidth, local.y >= height - 36 { return nil }
         if excludesHandle,
             local.x >= width / 2 - 40, local.x <= width / 2 + 40,
             local.y <= 26 {
@@ -208,6 +216,8 @@ struct TranslationOverlayView: View {
     /// When set, body text scrolls inside this fixed height instead of growing
     /// the card without bound (long clipboard translations).
     let textHeightLimit: CGFloat?
+    /// 钉住的卡片不自动隐藏，关闭才消失；状态由协调器持有（跨刷新保留）。
+    let contentPinned: Bool
     /// Resize bounds for scrollable cards; the coordinator derives them from
     /// the screen so a dragged-out handle stays on display.
     var minBodyHeight: CGFloat = 90
@@ -220,12 +230,17 @@ struct TranslationOverlayView: View {
     /// Called when the handle is released so the coordinator can settle the
     /// panel frame (top edge fixed) after SwiftUI has resized the content.
     var onResizeEnd: (CGFloat) -> Void = { _ in }
+    /// 钉住/解除钉住当前卡片。
+    var onTogglePin: () -> Void = {}
 
     @State private var closeHovered = false
     @State private var copyHovered = false
     @State private var copied = false
+    @State private var pinHovered = false
     @State private var handleHovered = false
     @State private var handlePressed = false
+    /// 卡片是否被鼠标悬停：驱动钉住按钮的浮现
+    @State private var cardHovered = false
     /// Body height while the handle is being dragged; nil falls back to the
     /// installed limit (also how double-click restores the default).
     @State private var liveLimit: CGFloat?
@@ -242,18 +257,19 @@ struct TranslationOverlayView: View {
                     .tracking(1.6)
                     .foregroundStyle(theme.accentColor)
                 Spacer(minLength: 8)
-                Button(action: copyTapped) {
-                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                Button(action: onTogglePin) {
+                    Image(systemName: contentPinned ? "pin.fill" : "pin")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(
-                            copied ? theme.accentColor : (copyHovered ? Color.primary : Color.secondary))
+                            contentPinned ? theme.accentColor : (pinHovered ? Color.primary : Color.secondary))
                         .frame(width: 22, height: 22)
-                        .background(chipBackground(highlighted: copyHovered || copied))
+                        .background(chipBackground(highlighted: pinHovered || contentPinned))
                 }
                 .buttonStyle(.plain)
-                .onHover { copyHovered = $0 }
-                .accessibilityLabel(Text("Copy"))
-                Button(action: onClose) {
+                .opacity(cardHovered || contentPinned ? 1 : 0)
+                .onHover { pinHovered = $0 }
+                .accessibilityLabel(Text("Pin"))
+                Button(action: copyTapped) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(closeHovered ? Color.primary : Color.secondary)
@@ -272,8 +288,9 @@ struct TranslationOverlayView: View {
         .padding(.bottom, 13)
         .frame(minWidth: 340, maxWidth: 600)
         .overlay { WindowDragCatcherRepresentable(
-            onHoverChange: onHoverChange,
-            excludesHandle: textHeightLimit != nil) }
+            onHoverChange: { cardHovered = $0 },
+            excludesHandle: textHeightLimit != nil,
+            pinChipVisible: cardHovered || contentPinned) }
         .overlay(alignment: .bottom) {
             if textHeightLimit != nil { resizeHandle }
         }
@@ -389,6 +406,8 @@ final class OverlayPanel: NSPanel {
         var avoid: NSRect?
         var slot: OverlayPosition?
         var isPinned = false
+        /// 钉住（不自动隐藏，关闭才消失）；与 isPinned（位置保持）语义不同
+        var contentPinned = false
         var usesAnchor = false
         var hideTask: Task<Void, Never>?
         /// Lets us detach the didMove observer when the entry goes away.
@@ -481,7 +500,11 @@ final class OverlayPanel: NSPanel {
             return
         }
         if behavior == .replace { hide() }
-        if entries.count >= 3 { remove(entries[0].id) }
+        if entries.count >= 3 {
+            // 挤掉最老的一张；钉住的卡片豁免——全部钉住时才挤最老的钉住卡
+            let victim = entries.first(where: { !$0.contentPinned }) ?? entries[0]
+            remove(victim.id)
+        }
         let target = screen ?? NSScreen.main
         let id = UUID()
         let panel = OverlayPanel(
@@ -545,6 +568,7 @@ final class OverlayPanel: NSPanel {
         let host = NSHostingView(
             rootView: TranslationOverlayView(
                 text: "Xg", fontSize: 10, theme: theme, surface: surface, textHeightLimit: 0,
+                contentPinned: false,
                 onClose: {}, onCopy: {}, onHoverChange: { _ in }))
         measurePanel.contentView = host
         host.layoutSubtreeIfNeeded()
@@ -571,12 +595,14 @@ final class OverlayPanel: NSPanel {
     private var measurePanelStorage: NSPanel?
 
     private func makeView(text: String, textHeightLimit: CGFloat?, id: UUID) -> TranslationOverlayView {
-        TranslationOverlayView(
+        let entry = entries.first(where: { $0.id == id })
+        return TranslationOverlayView(
             text: text,
             fontSize: textSize.points,
             theme: theme,
             surface: surface,
             textHeightLimit: textHeightLimit,
+            contentPinned: entry?.contentPinned ?? false,
             minBodyHeight: 90,
             maxBodyHeight: max(
                 90, (screenForEntry(id)?.visibleFrame.height ?? 900) - 120),
@@ -593,6 +619,9 @@ final class OverlayPanel: NSPanel {
             },
             onResizeEnd: { [weak self] bodyHeight in
                 self?.settleResize(of: id, to: bodyHeight)
+            },
+            onTogglePin: { [weak self] in
+                self?.togglePin(of: id)
             })
     }
 
@@ -632,6 +661,19 @@ final class OverlayPanel: NSPanel {
         isApplyingProgrammaticFrame = false
     }
 
+    /// 钉住/解除钉住：钉住的卡片不参与自动隐藏，关闭时才消失。
+    func togglePin(of id: UUID) {
+        guard let entry = entries.first(where: { $0.id == id }) else { return }
+        entry.contentPinned.toggle()
+        if entry.contentPinned {
+            entry.hideTask?.cancel()
+            DiagnosticLog.write("overlay pinned id=\(id.uuidString.prefix(6))")
+        } else {
+            scheduleHide(for: entry)
+            DiagnosticLog.write("overlay unpinned id=\(id.uuidString.prefix(6))")
+        }
+    }
+
     /// Pauses auto-hide while the cursor rests on the card so long
     /// translations can be read (and scrolled) at leisure.
     func setHovering(_ id: UUID, _ hovering: Bool) {
@@ -652,6 +694,8 @@ final class OverlayPanel: NSPanel {
     }
 
     private func scheduleHide(for entry: Entry) {
+        // 钉住的卡片不参与自动隐藏，关闭时才消失
+        guard !entry.contentPinned else { return }
         entry.hideTask?.cancel()
         guard !neverHide else { return }
         let seconds = hideAfter
