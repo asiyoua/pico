@@ -683,39 +683,28 @@ struct TranslationOverlayView: View {
             let size = NSSize(
                 width: fitting.width,
                 height: entry.plannedCardHeight ?? fitting.height)
-            let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
-            // 用户拖过的卡片停在哪儿就在哪儿（允许故意推出屏幕外），刷新
-            // 文本时保持左上角不动；只有自动摆放的新卡才保证完整落在所在
-            // 屏幕可视区内（任何尺寸的显示器上都不许出生在屏外）。
-            func place(_ frame: NSRect) {
-                if entry.isPinned || entry.usesAnchor, let bounds {
-                    entry.panel.setFrame(
-                        OverlaySizing.clampedIntoVisible(
-                            NSRect(x: frame.minX, y: frame.maxY - size.height,
-                                   width: size.width, height: size.height),
-                            in: bounds),
-                        display: true)
-                } else {
-                    entry.panel.setFrame(frame, display: true)
-                }
-            }
             if entry.isPinned {
                 // Keep the user-chosen top-left corner; only grow downward if
                 // the refreshed text needs a different height.
                 let old = entry.panel.frame
-                place(NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height))
+                entry.panel.setFrame(
+                    NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height),
+                    display: true)
                 continue
             }
             if let anchor, entry.usesAnchor || (entry.slot == nil && stackIndex == 0) {
                 entry.usesAnchor = true
-                place(Self.anchoredFrame(size: size, topLeft: anchor, on: entry.screen))
+                entry.panel.setFrame(
+                    Self.anchoredFrame(size: size, topLeft: anchor, on: entry.screen), display: true)
                 stackIndex += 1
                 continue
             }
             if entry.slot == nil {
                 entry.slot = resolveSlot(size: size, avoid: entry.avoid, screen: entry.screen, stackIndex: stackIndex)
             }
-            place(position(for: size, on: entry.screen, slot: entry.slot ?? position, stackIndex: stackIndex))
+            entry.panel.setFrame(
+                position(for: size, on: entry.screen, slot: entry.slot ?? position, stackIndex: stackIndex),
+                display: true)
             stackIndex += 1
         }
     }

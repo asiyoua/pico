@@ -94,4 +94,13 @@ final class MarkdownCardTests: XCTestCase {
         let attributed = MarkdownCard.inline("**没闭合的加粗", fontSize: 13, accentColor: .blue)
         XCTAssertEqual(String(attributed.characters), "**没闭合的加粗")
     }
+
+    func testInlineStrikethroughGetsLineStyle() {
+        let attributed = MarkdownCard.inline("~~划掉~~", fontSize: 13, accentColor: .blue)
+        var hasStyle = false
+        for run in attributed.runs where run.swiftUI.strikethroughStyle != nil {
+            hasStyle = true
+        }
+        XCTAssertTrue(hasStyle, "删除线必须映射到 strikethroughStyle")
+    }
 }

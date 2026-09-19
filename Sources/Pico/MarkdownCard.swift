@@ -149,9 +149,9 @@ enum MarkdownCard {
     /// 链接只保留样式（accent+下划线）并剥掉可点击属性——卡片是拿来
     /// 读的，不误触打开陌生网页。解析不抛错，失败回退原字符串。
     static func inline(
-        _ text: String, fontSize: CGFloat, accentColor: Color
+        _ text: String, fontSize: CGFloat, accentColor: Color, weight: Font.Weight = .medium
     ) -> AttributedString {
-        let base = Font.system(size: fontSize, weight: .medium)
+        let base = Font.system(size: fontSize, weight: weight)
         var attributed: AttributedString
         if var parsed = try? AttributedString(
             markdown: text,
@@ -169,6 +169,9 @@ enum MarkdownCard {
                     if intent.contains(.emphasized) { font = font.italic() }
                 }
                 parsed[info.range].swiftUI.font = font
+                if let intent = info.intent, intent.contains(.strikethrough) {
+                    parsed[info.range].swiftUI.strikethroughStyle = .single
+                }
                 if info.hasLink {
                     // 链接只留样式：剥掉可点击属性，避免误触打开陌生网页
                     parsed[info.range].link = nil
@@ -249,8 +252,8 @@ struct MarkdownCardBodyView: View {
     @ViewBuilder private func blockView(_ block: MarkdownCard.Block) -> some View {
         switch block {
         case .heading(let level, let content):
-            Text(MarkdownCard.inline(content, fontSize: headingFontSize(level), accentColor: accentColor))
-                .font(.system(size: headingFontSize(level), weight: .bold))
+            Text(MarkdownCard.inline(
+                content, fontSize: headingFontSize(level), accentColor: accentColor, weight: .bold))
                 .foregroundStyle(.primary)
         case .paragraph(let content):
             Text(MarkdownCard.inline(content, fontSize: fontSize, accentColor: accentColor))
