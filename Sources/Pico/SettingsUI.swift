@@ -731,10 +731,7 @@ struct SettingsView: View {
                 }
             }
             SettingsGroup(title: L10n.diagnosticsTitle(lang)) {
-                SettingsRow(
-                    label: L10n.diagnosticsRowLabel(lang),
-                    subtitle: L10n.diagnosticsBody(lang), divider: false
-                ) {
+                SettingsRow(label: L10n.diagnosticsRowLabel(lang), divider: false) {
                     Button(L10n.diagnosticsButton(lang)) { state.generateDiagnosticsReport() }
                 }
             }

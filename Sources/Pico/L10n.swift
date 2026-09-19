@@ -381,11 +381,6 @@ enum L10n {
     static func diagnosticsRowLabel(_ lang: UILanguage) -> String {
         lang == .chinese ? "诊断报告" : "Diagnostics File"
     }
-    static func diagnosticsBody(_ lang: UILanguage) -> String {
-        lang == .chinese
-            ? "遇到打字翻译没反应之类的问题，点右侧按钮生成诊断文件（保存在桌面并自动打开访达），包含版本、系统、权限状态与最近运行记录；不含翻译内容和 API 密钥，直接发给作者即可。"
-            : "If something does not work (e.g. live typing translation), click the button to generate a diagnostics file on your Desktop. It contains version, system, permission state and recent activity; no translated text and no API keys. Send the file to the author to help debug."
-    }
     static func diagnosticsButton(_ lang: UILanguage) -> String {
         lang == .chinese ? "生成诊断报告" : "Generate Diagnostics File"
     }
