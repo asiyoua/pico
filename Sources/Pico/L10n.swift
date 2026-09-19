@@ -69,9 +69,6 @@ enum L10n {
     static func permissionGranted(_ lang: UILanguage) -> String {
         lang == .chinese ? "✓ 已授权" : "✓ Granted"
     }
-    static func permissionHint(_ lang: UILanguage) -> String {
-        lang == .chinese ? "需要辅助功能权限才能读取输入内容" : "Accessibility permission is required to read typed text"
-    }
     static func openSystemSettings(_ lang: UILanguage) -> String {
         lang == .chinese ? "打开系统设置" : "Open System Settings"
     }
@@ -98,9 +95,6 @@ enum L10n {
     }
     static func modelSettings(_ lang: UILanguage) -> String {
         lang == .chinese ? "大语言模型" : "Language Models"
-    }
-    static func modelSettingsHint(_ lang: UILanguage) -> String {
-        lang == .chinese ? "已启用模型会按顺序尝试；超时或失败时自动切换到下一项。" : "Enabled models are tried in order; a timeout or failure advances to the next model."
     }
     static func addModel(_ lang: UILanguage) -> String { lang == .chinese ? "添加模型" : "Add Model" }
     static func removeModel(_ lang: UILanguage) -> String { lang == .chinese ? "删除模型" : "Remove Model" }
@@ -141,19 +135,11 @@ enum L10n {
     static func modelPlaceholder(_ lang: UILanguage) -> String { lang == .chinese ? "例如：DeepSeek 主模型" : "For example: Primary DeepSeek" }
     static func urlPlaceholder(_ lang: UILanguage) -> String { "https://api.example.com/v1" }
     static func modelIDPlaceholder(_ lang: UILanguage) -> String { lang == .chinese ? "例如：deepseek-chat" : "For example: deepseek-chat" }
-    static func promptPlaceholder(_ lang: UILanguage) -> String { lang == .chinese ? "留空使用默认翻译提示词" : "Leave empty to use the default translation prompt" }
-    static func noModels(_ lang: UILanguage) -> String { lang == .chinese ? "还没有配置模型。" : "No models configured." }
     static func modelEnabled(_ lang: UILanguage) -> String { lang == .chinese ? "启用" : "Enabled" }
-    static func localTranslationPrivacy(_ lang: UILanguage) -> String {
-        lang == .chinese ? "本地翻译不会把输入内容发送到网络。" : "On-device translation does not send typed text over the network."
-    }
     static func llmTranslationPrivacy(_ lang: UILanguage) -> String {
         lang == .chinese ? "大模型模式会把输入内容发送到所选 API 服务商。" : "Language-model mode sends typed text to the selected API provider."
     }
 
-    static func translationDirection(_ lang: UILanguage) -> String {
-        lang == .chinese ? "翻译方向" : "Direction"
-    }
     static func translationDirectionValue(_ lang: UILanguage) -> String {
         lang == .chinese ? "中文 → 英文" : "Chinese → English"
     }
@@ -198,9 +184,6 @@ enum L10n {
     }
     static func historyEmpty(_ lang: UILanguage) -> String {
         lang == .chinese ? "暂时没有已完成的翻译记录。" : "No completed translations yet."
-    }
-    static func historyStorageHint(_ lang: UILanguage) -> String {
-        lang == .chinese ? "历史记录仅保存在这台 Mac 上。" : "History is stored only on this Mac."
     }
     static func translateShortcut(_ lang: UILanguage) -> String {
         lang == .chinese ? "翻译快捷键" : "Translation Shortcut"
@@ -272,11 +255,6 @@ enum L10n {
         lang == .chinese
             ? "按下快捷键，把当前译文写回输入框。"
             : "Press the shortcut to replace the field with the current translation."
-    }
-    static func copyTranslationHint(_ lang: UILanguage) -> String {
-        lang == .chinese
-            ? "按下快捷键把当前英文译文复制到剪贴板。"
-            : "Press the shortcut to copy the current English translation."
     }
     static func groupSpeech(_ lang: UILanguage) -> String {
         lang == .chinese ? "朗读" : "Speech"

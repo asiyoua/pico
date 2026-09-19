@@ -38,7 +38,6 @@ enum MarkdownCard {
         var ordered: [String] = []
         var quote: [String] = []
         var code: [String]?
-        var listWasOrdered = false
 
         func flushParagraph() {
             guard !paragraph.isEmpty else { return }
@@ -113,7 +112,6 @@ enum MarkdownCard {
                 flushQuote()
                 isMarkdown = true
                 bullets.append((match.indent, match.content))
-                listWasOrdered = false
                 continue
             }
             if let match = orderedMatch(line) {
@@ -122,7 +120,6 @@ enum MarkdownCard {
                 flushQuote()
                 isMarkdown = true
                 ordered.append(match)
-                listWasOrdered = true
                 continue
             }
             if line.hasPrefix(">") {

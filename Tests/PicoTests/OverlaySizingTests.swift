@@ -56,4 +56,26 @@ final class OverlaySizingTests: XCTestCase {
         let single = OverlaySizing.textWidth(text: "aaaaaaa", fontSize: 13)
         XCTAssertEqual(mixed, single, accuracy: 2)
     }
+
+    func testClampedIntoVisiblePullsTopOverflowBackUnderTheMenuBar() {
+        // 长卡被拖得顶出屏幕：松手后顶边贴齐上缘内 8pt，尺寸不变
+        let bounds = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let dragged = NSRect(x: 300, y: 830, width: 500, height: 460)
+        let settled = OverlaySizing.clampedIntoVisible(dragged, in: bounds)
+        XCTAssertEqual(settled, NSRect(x: 300, y: 432, width: 500, height: 460))
+    }
+
+    func testClampedIntoVisibleAlsoFixesHorizontalAndBottomOverflow() {
+        let bounds = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let dragged = NSRect(x: 1200, y: -40, width: 500, height: 460)
+        let settled = OverlaySizing.clampedIntoVisible(dragged, in: bounds)
+        XCTAssertEqual(settled.minX, 1440 - 500 - 8)
+        XCTAssertEqual(settled.minY, 8)
+    }
+
+    func testClampedIntoVisibleKeepsFramesThatAreAlreadyInside() {
+        let bounds = NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let inside = NSRect(x: 300, y: 300, width: 500, height: 200)
+        XCTAssertEqual(OverlaySizing.clampedIntoVisible(inside, in: bounds), inside)
+    }
 }
