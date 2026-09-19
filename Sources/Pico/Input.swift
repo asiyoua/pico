@@ -452,15 +452,13 @@ public struct InputSessionID: Hashable, Sendable {
         }
     }
     private func logElementDetails(_ element: AXUIElement, prefix: String = "AX element") {
-        var names: CFArray?
-        let result = AXUIElementCopyAttributeNames(element, &names)
+        // 只记角色与子角色：完整属性列表一条就两 KB，会把诊断日志环挤满
         var role: CFTypeRef?
         var subrole: CFTypeRef?
         _ = AXUIElementCopyAttributeValue(element, kAXRoleAttribute as CFString, &role)
         _ = AXUIElementCopyAttributeValue(element, kAXSubroleAttribute as CFString, &subrole)
-        let attributes = (names as? [String] ?? []).joined(separator: ",")
         DiagnosticLog.write(
-            "\(prefix) role=\(role as? String ?? "unknown") subrole=\(subrole as? String ?? "unknown") attrs=\(attributes) attrStatus=\(result.rawValue)"
+            "\(prefix) role=\(role as? String ?? "unknown") subrole=\(subrole as? String ?? "unknown")"
         )
     }
 }
