@@ -665,6 +665,9 @@ struct MenuBarMenu: View {
             }
             guard LanguageTextDetector().contains(text, language: settings.sourceLanguage) else { return }
         }
+        // 微信读书等阅读器复制出来的选区没有换行，先按句子重建段落，
+        // 译文才能保持分段可读。
+        text = TextParagraphing.restoreParagraphBreaks(text)
         let session = InputSessionID(pid: ProcessInfo.processInfo.processIdentifier)
         let sentenceKey = "clipboard:\(text)"
         currentSession = session

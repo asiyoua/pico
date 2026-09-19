@@ -712,7 +712,12 @@ private extension LLMModelRouter {
     }
 
     static func translationPrompt(text: String, source: Language, target: Language) -> String {
-        "Translate the following text from \(languageName(source)) to \(languageName(target)). Return only the translated text.\n\n\(text)"
+        var instruction =
+            "Translate the following text from \(languageName(source)) to \(languageName(target)). Return only the translated text."
+        if text.contains("\n") {
+            instruction += " Keep the original paragraph breaks."
+        }
+        return "\(instruction)\n\n\(text)"
     }
 
     static func languageName(_ language: Language) -> String {
