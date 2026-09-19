@@ -175,17 +175,24 @@ struct MenuBarMenu: View {
             DiagnosticLog.write("accessibility monitor skipped")
             logger.info("accessibility monitor skipped")
         }
+        // 授权状态常驻观察（1s 一次，代价可忽略）：false→true 时更新状态、
+        // 收起提醒窗并拉起监控；true→false 只更新状态——会话中不弹窗，
+        // 下次启动或打开主开关才提醒。老版轮询在授权恢复后即退出，会话中
+        // 授权再死（系统设置里被手动关掉、策略重置）就无人盯梢，重勾后
+        // 监控不会重启，要重启应用才恢复——本循环修复该缺口。
         permissionPoll = Task { @MainActor [weak self] in
-            while let self, !self.permissionGranted {
+            while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
-                guard !Task.isCancelled else { return }
-                if AXIsProcessTrusted() {
-                    self.permissionGranted = true
-                    self.reauthWindow?.orderOut(nil)
-                    self.reauthWindow = nil
-                    self.monitor.start()
-                    return
-                }
+                guard let self, !Task.isCancelled else { return }
+                let trusted = AXIsProcessTrusted()
+                guard trusted != self.permissionGranted else { continue }
+                self.permissionGranted = trusted
+                guard trusted else { continue }
+                DiagnosticLog.write("accessibility permission restored, starting monitor")
+                logger.info("accessibility permission restored, starting monitor")
+                self.reauthWindow?.orderOut(nil)
+                self.reauthWindow = nil
+                self.monitor.start()
             }
         }
         hotKey.onAction = { [weak self] action in

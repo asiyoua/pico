@@ -310,6 +310,8 @@ public struct InputSessionID: Hashable, Sendable {
             return "probe target=\(target.bundleID) result=app_not_running"
         }
         let appElement = AXUIElementCreateApplication(target.pid)
+        // 目标应用若挂起，AX 调用默认可阻塞 6 秒；探针限 2 秒防设置窗被卡住
+        AXUIElementSetMessagingTimeout(appElement, 2.0)
         var value: CFTypeRef?
         let status = AXUIElementCopyAttributeValue(
             appElement, kAXFocusedUIElementAttribute as CFString, &value)
