@@ -423,11 +423,13 @@ struct TranslationOverlayView: View {
             rootView: makeView(text: entry.text, textHeightLimit: entry.textHeightLimit, id: entry.id))
     }
 
-    /// Card height ceiling: roughly half the screen so long translations stay
-    /// readable instead of spilling past the display edge.
+    /// Card height ceiling: roughly 60% of the visible screen so long
+    /// translations stay readable instead of spilling past the display edge.
+    /// 小屏（13 寸 Air 可视高 ~750pt）按 0.55 只给 ~55%，阅读区太小，
+    /// 提到 0.6；大屏仍受 460 上限约束不受影响。
     private func cardHeightLimit(on screen: NSScreen?) -> CGFloat {
         let visible = screen?.visibleFrame.height ?? NSScreen.main?.visibleFrame.height ?? 900
-        return min(460, max(240, visible * 0.55))
+        return min(460, max(240, visible * 0.6))
     }
 
     /// Header row + outer padding height, measured once with a zero-height
@@ -637,6 +639,7 @@ struct TranslationOverlayView: View {
     private func relayout() {
         isApplyingProgrammaticFrame = true
         defer { isApplyingProgrammaticFrame = false }
+        let fallbackBounds = NSScreen.main?.visibleFrame
         var stackIndex = 0
         for entry in entries {
             entry.panel.contentView?.layoutSubtreeIfNeeded()
@@ -646,28 +649,36 @@ struct TranslationOverlayView: View {
             let size = NSSize(
                 width: fitting.width,
                 height: entry.plannedCardHeight ?? fitting.height)
+            let bounds = entry.screen?.visibleFrame ?? fallbackBounds
+            // 兼容性不变量：无论哪条路径摆放、什么尺寸的屏幕（外部用户
+            // 13.3 寸 Air 可视高仅 ~750pt），卡片最终都必须完整落在所在
+            // 屏幕的可视区内，杜绝出生/刷新后悬出屏幕。
+            func place(_ frame: NSRect) {
+                let final: NSRect
+                if let bounds {
+                    final = OverlaySizing.clampedIntoVisible(frame, in: bounds)
+                } else {
+                    final = frame
+                }
+                entry.panel.setFrame(final, display: true)
+            }
             if entry.isPinned {
                 // Keep the user-chosen top-left corner; only grow downward if
                 // the refreshed text needs a different height.
                 let old = entry.panel.frame
-                entry.panel.setFrame(
-                    NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height),
-                    display: true)
+                place(NSRect(x: old.minX, y: old.maxY - size.height, width: size.width, height: size.height))
                 continue
             }
             if let anchor, entry.usesAnchor || (entry.slot == nil && stackIndex == 0) {
                 entry.usesAnchor = true
-                entry.panel.setFrame(
-                    Self.anchoredFrame(size: size, topLeft: anchor, on: entry.screen), display: true)
+                place(Self.anchoredFrame(size: size, topLeft: anchor, on: entry.screen))
                 stackIndex += 1
                 continue
             }
             if entry.slot == nil {
                 entry.slot = resolveSlot(size: size, avoid: entry.avoid, screen: entry.screen, stackIndex: stackIndex)
             }
-            entry.panel.setFrame(
-                position(for: size, on: entry.screen, slot: entry.slot ?? position, stackIndex: stackIndex),
-                display: true)
+            place(position(for: size, on: entry.screen, slot: entry.slot ?? position, stackIndex: stackIndex))
             stackIndex += 1
         }
     }
