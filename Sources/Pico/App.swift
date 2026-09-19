@@ -167,9 +167,6 @@ struct MenuBarMenu: View {
             self?.speech.stop()
             Task { await self?.coordinator.cancel() }
         }
-        if permissionGranted {
-            UserDefaults.standard.set(true, forKey: "hadAccessibilityPermission")
-        }
         if permissionGranted && enabled {
             monitor.start()
             DiagnosticLog.write("accessibility monitor started")
@@ -184,7 +181,6 @@ struct MenuBarMenu: View {
                 guard !Task.isCancelled else { return }
                 if AXIsProcessTrusted() {
                     self.permissionGranted = true
-                    UserDefaults.standard.set(true, forKey: "hadAccessibilityPermission")
                     self.reauthWindow?.orderOut(nil)
                     self.reauthWindow = nil
                     self.monitor.start()
@@ -296,6 +292,7 @@ struct MenuBarMenu: View {
             permissionGranted = AXIsProcessTrusted()
             monitor.start()
             refreshHotKeys()
+            maybePresentReauth()
         } else {
             input.reset()
             monitor.stop()
@@ -495,16 +492,30 @@ struct MenuBarMenu: View {
         DiagnosticLog.write("speech speaking length=\(text.count)")
         speech.speak(text, language: settings.targetLanguage)
     }
-    /// 曾授权过辅助功能、如今掉了的用户：主动提示重开，避免打字翻译
-    /// 静默失效没人发现。新用户（从未授权）走欢迎窗，不弹这个。
+    /// 授权失效提醒：走过引导的老用户如果当前没有辅助功能授权（系统更新、
+    /// 重装或换签名都可能吊销），启动几秒后主动弹窗指路，避免打字翻译静默
+    /// 失效没人发现。纯新用户走欢迎窗，不弹这个。
     func maybePresentReauth() {
-        guard enabled, !showWelcome, !reauthDismissedThisSession else { return }
-        guard !AXIsProcessTrusted() else {
-            UserDefaults.standard.set(true, forKey: "hadAccessibilityPermission")
-            return
+        let trusted = AXIsProcessTrusted()
+        let onboarded = UserDefaults.standard.bool(forKey: "onboardingComplete")
+        let status = "reauth check enabled=\(enabled) onboarded=\(onboarded) trusted=\(trusted) dismissed=\(reauthDismissedThisSession)"
+        DiagnosticLog.write(status)
+        logger.info("\(status, privacy: .public)")
+        guard ReauthGate.shouldPrompt(
+            masterEnabled: enabled, onboardingComplete: onboarded,
+            dismissedThisSession: reauthDismissedThisSession, currentlyTrusted: trusted)
+        else { return }
+        // TCC 在启动初期偶发抖动：3 秒后复核仍失败才弹，防止已授权用户被误打扰
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(3))
+            guard let self, !Task.isCancelled else { return }
+            if AXIsProcessTrusted() {
+                DiagnosticLog.write("reauth check: trust recovered during confirmation")
+                logger.info("reauth check: trust recovered during confirmation")
+                return
+            }
+            self.presentReauth()
         }
-        guard UserDefaults.standard.bool(forKey: "hadAccessibilityPermission") else { return }
-        presentReauth()
     }
 
     private func presentReauth() {
@@ -515,8 +526,10 @@ struct MenuBarMenu: View {
         window.title = L10n.reauthTitle(settings.uiLanguage)
         let controller = ReauthController()
         controller.onDismiss = { [weak self] in
+            self?.reauthDismissedThisSession = true
             self?.reauthWindow?.orderOut(nil)
             self?.reauthWindow = nil
+            DiagnosticLog.write("reauth prompt dismissed")
         }
         window.contentView = NSHostingView(
             rootView: ReauthView(controller: controller, lang: settings.uiLanguage)
@@ -526,6 +539,8 @@ struct MenuBarMenu: View {
         window.level = .floating
         window.orderFrontRegardless()
         reauthWindow = window
+        DiagnosticLog.write("reauth prompt presented")
+        NSLog("Pico reauth prompt presented")
     }
 
     func setReplaceOriginal(_ enabled: Bool) {
@@ -694,6 +709,20 @@ private struct PendingTranslationAction {
 }
 
 import AppKit
+
+/// 「辅助功能授权失效」弹窗的判定，纯函数便于单测。走过引导
+/// （onboardingComplete）是老用户的判据：授权可能在升级或换签名时被系统
+/// 吊销，门槛不能用「本版本见过授权」之类的缓存——那会让吊销发生在老版本
+/// 时代的目标用户永远凑不齐条件，弹窗对真正需要的人失明。
+enum ReauthGate {
+    static func shouldPrompt(
+        masterEnabled: Bool, onboardingComplete: Bool, dismissedThisSession: Bool,
+        currentlyTrusted: Bool
+    ) -> Bool {
+        guard masterEnabled, onboardingComplete, !dismissedThisSession else { return false }
+        return !currentlyTrusted
+    }
+}
 
 @MainActor final class ReauthController: ObservableObject {
     var onDismiss: (() -> Void)?
