@@ -363,8 +363,8 @@ enum L10n {
     }
     static func reauthBody(_ lang: UILanguage) -> String {
         lang == .chinese
-            ? "打字实时翻译需要辅助功能权限。系统更新或重新安装后，这个权限可能需要重新打开——去系统设置里重新勾选 Pico 即可恢复，设置与历史不受影响。"
-            : "Live translation needs the Accessibility permission. After a macOS update or a reinstall it may need to be re-enabled — turn Pico back on in System Settings and everything is restored. Settings and history are untouched."
+            ? "打字实时翻译需要辅助功能权限。请打开「系统设置 → 隐私与安全性 → 辅助功能」找到 Pico：如果开关已经是开的，请先关掉再打开——升级后旧开关看着开着，其实已经失效。完成即恢复，设置与历史不受影响。"
+            : "Live typing translation needs the Accessibility permission. In System Settings → Privacy & Security → Accessibility, find Pico: if the switch already looks on, turn it off and back on — after an update the old switch can look on but no longer work. It recovers right away; settings and history are untouched."
     }
     static func reauthOpenSettings(_ lang: UILanguage) -> String {
         lang == .chinese ? "打开系统设置" : "Open System Settings"

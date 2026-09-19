@@ -568,7 +568,7 @@ struct MenuBarMenu: View {
     private func presentReauth() {
         guard reauthWindow == nil else { return }
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 190), styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 210), styleMask: [.titled, .closable],
             backing: .buffered, defer: false)
         window.title = L10n.reauthTitle(settings.uiLanguage)
         let controller = ReauthController()
@@ -580,7 +580,7 @@ struct MenuBarMenu: View {
         }
         window.contentView = NSHostingView(
             rootView: ReauthView(controller: controller, lang: settings.uiLanguage)
-                .frame(width: 400, height: 168))
+                .frame(width: 400, height: 188))
         centerOnMainScreen(window)
         window.isReleasedWhenClosed = false
         window.level = .floating
