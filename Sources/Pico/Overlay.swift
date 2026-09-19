@@ -88,8 +88,15 @@ final class WindowDragCatcherView: NSView {
         trackingArea = area
     }
 
-    override func mouseEntered(with event: NSEvent) { onHoverChange(true) }
-    override func mouseExited(with event: NSEvent) { onHoverChange(false) }
+    override func mouseEntered(with event: NSEvent) {
+        onHoverChange(true)
+        DiagnosticLog.write("catcher hover enter")
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        onHoverChange(false)
+        DiagnosticLog.write("catcher hover exit")
+    }
 
     override func scrollWheel(with event: NSEvent) {
         if scrollTarget == nil {
@@ -707,9 +714,18 @@ final class OverlayPanel: NSPanel {
         anchor = topLeft
     }
 
+    /// 判定光标是否压在卡片上（scheduleHide 的豁免条件）；测试可注入固定值。
+    var cursorOverCard: (NSRect) -> Bool = { frame in frame.contains(NSEvent.mouseLocation) }
+
     private func scheduleHide(for entry: Entry) {
         // 钉住的卡片不参与自动隐藏，关闭时才消失
         guard !entry.contentPinned else { return }
+        // 光标正压在卡片上时不启动隐藏计时——卡片弹出时光标可能本来就在
+        // 卡片位置，此时没有 mouseEntered 边界事件，悬停暂停只能靠这里兜住
+        if cursorOverCard(entry.panel.frame) {
+            DiagnosticLog.write("auto-hide skipped: cursor over card")
+            return
+        }
         entry.hideTask?.cancel()
         guard !neverHide else { return }
         let seconds = hideAfter

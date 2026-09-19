@@ -62,6 +62,8 @@ final class OverlayCoordinatorRenderingTests: XCTestCase {
     }
 
     func testHoverPausesAutoHideUntilCursorLeaves() async throws {
+        // 不依赖真实光标位置
+        coordinator.cursorOverCard = { _ in false }
         coordinator.hideAfter = 0.5
         coordinator.show(Self.longChineseText(), key: "hover-key", on: NSScreen.main)
         let id = try XCTUnwrap(coordinator.shownEntryIDs.first)
@@ -75,10 +77,21 @@ final class OverlayCoordinatorRenderingTests: XCTestCase {
     }
 
     func testAutoHideStillFiresWithoutHover() async throws {
+        // 不依赖真实光标位置
+        coordinator.cursorOverCard = { _ in false }
         coordinator.hideAfter = 0.5
         coordinator.show(Self.longChineseText(), key: "plain-key", on: NSScreen.main)
         try await Task.sleep(for: .milliseconds(1200))
         XCTAssertTrue(coordinator.shownEntryIDs.isEmpty)
+    }
+
+    func testCursorOverCardAtBirthSuppressesAutoHide() async throws {
+        // 光标压在卡片上时（卡片可能正好弹出在光标位置），隐藏计时豁免
+        coordinator.cursorOverCard = { _ in true }
+        coordinator.hideAfter = 0.3
+        coordinator.show(Self.longChineseText(), key: "under-cursor", on: NSScreen.main)
+        try await Task.sleep(for: .milliseconds(800))
+        XCTAssertEqual(coordinator.shownEntryIDs.count, 1, "光标压卡时不得自动隐藏")
     }
 
     func testResizeGrowsCardWithTopEdgeFixed() throws {
