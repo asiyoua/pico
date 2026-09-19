@@ -568,7 +568,7 @@ struct MenuBarMenu: View {
     private func presentReauth() {
         guard reauthWindow == nil else { return }
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 210), styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 258), styleMask: [.titled, .closable],
             backing: .buffered, defer: false)
         window.title = L10n.reauthTitle(settings.uiLanguage)
         let controller = ReauthController()
@@ -580,7 +580,7 @@ struct MenuBarMenu: View {
         }
         window.contentView = NSHostingView(
             rootView: ReauthView(controller: controller, lang: settings.uiLanguage)
-                .frame(width: 400, height: 188))
+                .frame(width: 400, height: 230))
         centerOnMainScreen(window)
         window.isReleasedWhenClosed = false
         window.level = .floating
@@ -774,7 +774,29 @@ enum ReauthGate {
     }
 }
 
+/// 自动移除本应用已失效的辅助功能授权记录——等价于在系统设置里点「−」，
+/// 但用户不需要会找那个按钮。tccutil 对指定 Bundle ID 的 reset 免认证。
+enum AccessibilityGrantResetter {
+    enum Outcome { case removed, alreadyClear, failed }
+    static func resetOwnGrant(bundleID: String) -> Outcome {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleID]
+        process.standardOutput = Pipe()
+        process.standardError = Pipe()
+        do { try process.run() } catch { return .failed }
+        process.waitUntilExit()
+        switch process.terminationStatus {
+        case 0: return .removed
+        case 64: return .alreadyClear  // tccutil 对无授权记录的 Bundle ID 报 No such bundle identifier
+        default: return .failed
+        }
+    }
+}
+
 @MainActor final class ReauthController: ObservableObject {
+    enum Step { case start, removed, failed }
+    @Published var step: Step = .start
     var onDismiss: (() -> Void)?
 
     func openSettings() {
@@ -787,6 +809,21 @@ enum ReauthGate {
     func later() {
         onDismiss?()
     }
+
+    /// 弹窗期间用户可能已在系统设置里重勾（观察器随后会收起本窗），此时
+    /// 不动授权直接收工；tccutil 放后台线程跑，不阻塞界面。
+    func removeStaleGrant() {
+        guard !AXIsProcessTrusted() else { onDismiss?(); return }
+        Task {
+            let outcome = await Task.detached(priority: .userInitiated) {
+                AccessibilityGrantResetter.resetOwnGrant(
+                    bundleID: Bundle.main.bundleIdentifier ?? "com.asiyoua.pico")
+            }.value
+            let ok = outcome != .failed
+            DiagnosticLog.write("reauth stale grant reset outcome=\(String(describing: outcome))")
+            step = ok ? .removed : .failed
+        }
+    }
 }
 
 struct ReauthView: View {
@@ -795,17 +832,40 @@ struct ReauthView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(L10n.reauthTitle(lang))
-                .font(.headline)
-            Text(L10n.reauthBody(lang))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            HStack {
-                Spacer()
-                Button(L10n.reauthLater(lang)) { controller.later() }
-                Button(L10n.reauthOpenSettings(lang)) { controller.openSettings() }
-                    .buttonStyle(.borderedProminent)
+            Text(L10n.reauthTitle(lang)).font(.headline)
+            switch controller.step {
+            case .start:
+                Text(L10n.reauthWizardIntro(lang))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button(L10n.reauthLater(lang)) { controller.later() }
+                    Button(L10n.reauthWizardRemove(lang)) { controller.removeStaleGrant() }
+                        .buttonStyle(.borderedProminent)
+                }
+            case .removed:
+                Text(L10n.reauthWizardSteps(lang))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button(L10n.reauthLater(lang)) { controller.later() }
+                    Button(L10n.reauthWizardOpenSettings(lang)) { controller.openSettings() }
+                        .buttonStyle(.borderedProminent)
+                }
+            case .failed:
+                Text(L10n.reauthWizardRemoveFailed(lang))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                HStack {
+                    Spacer()
+                    Button(L10n.reauthLater(lang)) { controller.later() }
+                    Button(L10n.reauthOpenSettings(lang)) { controller.openSettings() }
+                }
             }
         }
         .padding(20)

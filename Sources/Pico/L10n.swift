@@ -361,10 +361,26 @@ enum L10n {
     static func reauthTitle(_ lang: UILanguage) -> String {
         lang == .chinese ? "需要重新授权辅助功能" : "Accessibility Permission Needed"
     }
-    static func reauthBody(_ lang: UILanguage) -> String {
+    static func reauthWizardIntro(_ lang: UILanguage) -> String {
         lang == .chinese
-            ? "打字实时翻译需要辅助功能权限。请打开「系统设置 → 隐私与安全性 → 辅助功能」：在列表中选中 Pico，点「−」移除，再点「＋」重新添加并打开开关——升级后旧开关看着开着，其实已经失效，光开关一次可能不够。完成即恢复，设置与历史不受影响。"
-            : "Live typing translation needs the Accessibility permission. In System Settings → Privacy & Security → Accessibility, select Pico in the list, remove it with the − button, re-add it with ＋ and turn the switch on — after an update the old switch can look on but be dead, and a plain toggle may not be enough. It recovers right away; settings and history are untouched."
+            ? "打字实时翻译需要辅助功能授权。升级后旧授权记录会失效，光开关一下不够：点下方按钮自动移除失效记录（约 1 秒），再按两步重新添加，全程约 10 秒；设置与历史不受影响。"
+            : "Live typing translation needs the Accessibility permission, and after an upgrade the old entry goes stale — flipping the switch is not enough. Click the button below to remove the stale entry automatically (about 1 second), then re-add it in two steps. Around 10 seconds total; settings and history are untouched."
+    }
+    static func reauthWizardRemove(_ lang: UILanguage) -> String {
+        lang == .chinese ? "自动移除失效记录" : "Remove Stale Entry"
+    }
+    static func reauthWizardSteps(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "已移除。还剩两步：\n2. 点下方按钮打开系统设置，在辅助功能列表点「＋」，在「应用程序」里选中 Pico 点「选取」\n3. 打开 Pico 的开关，几秒内自动恢复。"
+            : "Removed. Two steps left:\n2. Click the button below to open System Settings. In the Accessibility list click ＋, pick Pico under Applications, click Open\n3. Turn Pico's switch on — it recovers within seconds."
+    }
+    static func reauthWizardOpenSettings(_ lang: UILanguage) -> String {
+        lang == .chinese ? "2. 打开系统设置" : "2. Open System Settings"
+    }
+    static func reauthWizardRemoveFailed(_ lang: UILanguage) -> String {
+        lang == .chinese
+            ? "自动移除没有成功。请在辅助功能列表里单击选中 Pico 这一行，点列表下方的「−」移除，再点「＋」从「应用程序」重新添加并打开开关。"
+            : "Automatic removal did not succeed. In the Accessibility list, click the Pico row to select it, remove it with the − button, re-add it with ＋ from Applications and turn the switch on."
     }
     static func reauthOpenSettings(_ lang: UILanguage) -> String {
         lang == .chinese ? "打开系统设置" : "Open System Settings"
