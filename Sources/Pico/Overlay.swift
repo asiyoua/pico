@@ -534,23 +534,19 @@ struct TranslationOverlayView: View {
     /// 拖拽结束的落位。原生拖拽跟随光标，而光标顶到屏幕上缘就物理停住，
     /// 卡顶永远差着「抓握点到卡顶」的距离——外部用户实测「长卡拖不到最
     /// 顶上，越短越上」的根因。因此松手时光标若已被顶到屏幕上缘 40pt 内
-    /// （＝用户在使劲往顶上推），直接把卡顶贴齐菜单栏下缘落位；其余情况
-    /// 卡片悬出屏幕则整体收回可视区。之后 150/400/700ms 三个节拍复核，
-    /// 兜住系统平铺回弹等滞后动画，终态必然符合落位。
+    /// （＝用户在使劲往顶上推），把卡顶贴齐菜单栏下缘落位；其余情况卡片
+    /// 悬出屏幕则整体收回可视区。
+    /// 只落位一次，不做节拍复核：外部用户实测松手后紧接着再拖时，残留
+    /// 节拍会反复抢夺卡片（1.2 秒被强制移动三次），体感=拖不动。松手
+    /// 后若系统还有滞后动画，用户再拖一次即可重新落位。
     func settleAfterDrag(of id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         let bounds = entry.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
         let pushedToTop = bounds.map { NSEvent.mouseLocation.y > $0.maxY - 40 } ?? false
-        Task { [weak self] in
-            for delay: Duration in [.zero, .milliseconds(150), .milliseconds(400), .milliseconds(700)] {
-                if delay > .zero { try? await Task.sleep(for: delay) }
-                guard !Task.isCancelled, let self, self.entries.contains(where: { $0.id == id }) else { return }
-                if pushedToTop {
-                    self.snapTop(of: id)
-                } else {
-                    self.settleIntoView(of: id)
-                }
-            }
+        if pushedToTop {
+            snapTop(of: id)
+        } else {
+            settleIntoView(of: id)
         }
     }
 
