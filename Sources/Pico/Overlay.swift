@@ -366,6 +366,15 @@ struct TranslationOverlayView: View {
     }
 }
 
+/// 自由浮窗面板：关闭 AppKit 默认的窗口框架约束——默认实现会把窗口
+/// 顶边压回菜单栏/屏幕上缘之下，导致「把卡片往顶上抽出去」永远做不到
+/// （左右下三向系统本就不设栏）。四向自由全靠这个覆写。
+final class OverlayPanel: NSPanel {
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect {
+        frameRect
+    }
+}
+
 @MainActor final class OverlayCoordinator {
     private final class Entry {
         let id: UUID
@@ -475,7 +484,7 @@ struct TranslationOverlayView: View {
         if entries.count >= 3 { remove(entries[0].id) }
         let target = screen ?? NSScreen.main
         let id = UUID()
-        let panel = NSPanel(
+        let panel = OverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 520, height: 64), styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered, defer: false)
         panel.isOpaque = false
