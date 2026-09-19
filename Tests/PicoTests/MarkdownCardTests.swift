@@ -11,9 +11,21 @@ final class MarkdownCardTests: XCTestCase {
     }
 
     func testMathAsterisksAreNotMistakenForEmphasis() {
-        // 没有块级强特征的文本不启用 Markdown，星号原样保留
+        // 没有块级强特征、也没有双星行内特征的文本不启用 Markdown
         let document = MarkdownCard.parse("2*3*4 等于 24")
         XCTAssertFalse(document.isMarkdown)
+    }
+
+    func testInlineOnlyBoldTextIsDetectedAsMarkdown() {
+        // 双星行内特征（AI 输出最常见的形态）也必须启用渲染
+        let document = MarkdownCard.parse("这是**加粗**和*斜体*的混排段落。")
+        XCTAssertTrue(document.isMarkdown)
+        XCTAssertEqual(document.blocks.count, 1)
+        if case .paragraph(let text) = document.blocks[0] {
+            XCTAssertEqual(text, "这是**加粗**和*斜体*的混排段落。")
+        } else {
+            XCTFail("应为单段落块")
+        }
     }
 
     func testHeadingLevelAndTrailingParagraph() {

@@ -139,6 +139,13 @@ enum MarkdownCard {
             blocks.append(.code(code.joined(separator: "\n")))
         }
         flushAll()
+        // 行内强特征：双星（加粗）/双反引号（行内码）/双波浪（删除线）。
+        // 单星算术（2*3*4）不会被误判。
+        if !isMarkdown,
+            text.contains("**") || text.contains("``") || text.contains("~~") {
+            isMarkdown = true
+            blocks = [.paragraph(text)]
+        }
         if !isMarkdown {
             return Document(isMarkdown: false, blocks: [.paragraph(text)])
         }

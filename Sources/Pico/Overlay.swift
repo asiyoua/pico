@@ -261,15 +261,26 @@ struct TranslationOverlayView: View {
                     Image(systemName: contentPinned ? "pin.fill" : "pin")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(
-                            contentPinned ? theme.accentColor : (pinHovered ? Color.primary : Color.secondary))
+                            contentPinned ? Color.primary : (pinHovered ? Color.primary : Color.secondary))
                         .frame(width: 22, height: 22)
-                        .background(chipBackground(highlighted: pinHovered || contentPinned))
+                        .background(chipBackground(highlighted: pinHovered))
                 }
                 .buttonStyle(.plain)
                 .opacity(cardHovered || contentPinned ? 1 : 0)
                 .onHover { pinHovered = $0 }
                 .accessibilityLabel(Text("Pin"))
                 Button(action: copyTapped) {
+                    Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(
+                            copied ? theme.accentColor : (copyHovered ? Color.primary : Color.secondary))
+                        .frame(width: 22, height: 22)
+                        .background(chipBackground(highlighted: copyHovered || copied))
+                }
+                .buttonStyle(.plain)
+                .onHover { copyHovered = $0 }
+                .accessibilityLabel(Text("Copy"))
+                Button(action: onClose) {
                     Image(systemName: "xmark")
                         .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(closeHovered ? Color.primary : Color.secondary)
@@ -662,6 +673,8 @@ final class OverlayPanel: NSPanel {
     }
 
     /// 钉住/解除钉住：钉住的卡片不参与自动隐藏，关闭时才消失。
+    /// 切换后重建内容视图，让钉住图标的状态立即反映（否则视图停留在
+    /// 创建时的快照，点击无视觉反馈）。
     func togglePin(of id: UUID) {
         guard let entry = entries.first(where: { $0.id == id }) else { return }
         entry.contentPinned.toggle()
@@ -672,6 +685,7 @@ final class OverlayPanel: NSPanel {
             scheduleHide(for: entry)
             DiagnosticLog.write("overlay unpinned id=\(id.uuidString.prefix(6))")
         }
+        installContent(for: entry)
     }
 
     /// Pauses auto-hide while the cursor rests on the card so long
