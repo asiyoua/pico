@@ -43,4 +43,33 @@ final class OverlayPinningTests: XCTestCase {
         XCTAssertFalse(coordinator.shownEntryIDs.isEmpty)
         XCTAssertTrue(coordinator.shownEntryIDs.contains(pinnedID), "钉住的卡片必须豁免挤占")
     }
+
+    /// 钉住语义=只随显式关闭消失：会话清空（切窗口触发 reset→onEmpty）、
+    /// replace 换卡、空文本 show 等「非用户点名关闭」都必须豁免钉住卡。
+    /// 回归背景：切窗口曾把钉住的卡一起 hide() 干掉（用户 2026-09-20 报）。
+    func testHideUnpinnedSparesPinnedCards() {
+        let coordinator = OverlayCoordinator()
+        coordinator.show("甲", key: "a", on: NSScreen.main)
+        coordinator.show("乙", key: "b", on: NSScreen.main)
+        let pinnedID = coordinator.shownEntryIDs[0]
+        coordinator.togglePin(of: pinnedID)
+
+        coordinator.hideUnpinned()
+
+        XCTAssertEqual(coordinator.shownEntryIDs, [pinnedID], "hideUnpinned 必须保留钉住的卡片")
+    }
+
+    func testReplaceModeSparesPinnedCards() throws {
+        let coordinator = OverlayCoordinator()
+        coordinator.behavior = .replace
+        coordinator.neverHide = true
+        coordinator.show("钉住的旧卡", key: "pinned", on: NSScreen.main)
+        let pinnedID = try XCTUnwrap(coordinator.shownEntryIDs.first)
+        coordinator.togglePin(of: pinnedID)
+
+        coordinator.show("新卡", key: "new", on: NSScreen.main)
+
+        XCTAssertTrue(coordinator.shownEntryIDs.contains(pinnedID), "replace 不得顶掉钉住的卡片")
+        XCTAssertEqual(coordinator.shownEntryIDs.count, 2, "replace 模式下新卡与钉住卡并存")
+    }
 }

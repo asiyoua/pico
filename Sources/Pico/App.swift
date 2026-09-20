@@ -163,7 +163,8 @@ struct MenuBarMenu: View {
         }
         input.onEmpty = { [weak self] in
             self?.clearPendingAction()
-            self?.overlay.hide()
+            // 焦点变化/输入清空走这里：只清未钉住的卡，钉住的随显式关闭消失
+            self?.overlay.hideUnpinned()
             self?.speech.stop()
             Task { await self?.coordinator.cancel() }
         }
@@ -280,7 +281,7 @@ struct MenuBarMenu: View {
         translationHolder.configure(source: source, target: target)
         currentSession = nil
         clearPendingAction()
-        overlay.hide()
+        overlay.hideUnpinned()
         speech.stop()
         let coordinator = coordinator
         let service = translationService

@@ -513,7 +513,7 @@ final class OverlayPanel: NSPanel {
     func show(_ text: String, on screen: NSScreen?) { show(text, key: UUID().uuidString, on: screen) }
     func show(_ text: String, key: String, on screen: NSScreen?, avoid: NSRect? = nil) {
         guard !text.isEmpty else {
-            hide()
+            hideUnpinned()
             return
         }
         if let existing = entries.first(where: { $0.key == key }) {
@@ -527,7 +527,8 @@ final class OverlayPanel: NSPanel {
             relayout()
             return
         }
-        if behavior == .replace { hide() }
+        // replace 模式只顶掉未钉住的卡：钉住的卡只随显式关闭消失
+        if behavior == .replace { hideUnpinned() }
         if entries.count >= 3 {
             // 挤掉最老的一张；钉住的卡片豁免——全部钉住时才挤最老的钉住卡
             let victim = entries.first(where: { !$0.contentPinned }) ?? entries[0]
@@ -754,6 +755,19 @@ final class OverlayPanel: NSPanel {
             entry.panel.orderOut(nil)
         }
         entries.removeAll()
+    }
+
+    /// 关闭未钉住的卡片，钉住的保留——钉住语义=只随显式关闭消失，凡是
+    /// 「非用户点名关闭」的路径（输入会话清空、replace 换卡、改翻译设置、
+    /// 空文本 show）都必须走这里而不是 hide()，否则切个窗口钉住的卡就没。
+    func hideUnpinned() {
+        for entry in entries where !entry.contentPinned {
+            entry.hideTask?.cancel()
+            if let observer = entry.moveObserver { NotificationCenter.default.removeObserver(observer) }
+            entry.panel.orderOut(nil)
+        }
+        entries.removeAll { !$0.contentPinned }
+        relayout()
     }
     private func remove(_ id: UUID) {
         guard let index = entries.firstIndex(where: { $0.id == id }) else { return }
