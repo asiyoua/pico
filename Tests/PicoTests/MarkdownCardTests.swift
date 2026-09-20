@@ -102,9 +102,10 @@ final class MarkdownCardTests: XCTestCase {
         XCTAssertTrue(sawLinkRemoved, "链接必须剥掉可点击属性（隐私：不误触打开网页）")
     }
 
-    func testInlineFallsBackGracefullyOnUnbalancedMarkers() {
+    func testUnbalancedMarkersGetStripped() {
+        // 未配对的 ** 属于破损标记：剥掉符号、保留文字（不把符号留在卡片上）
         let attributed = MarkdownCard.inline("**没闭合的加粗", fontSize: 13, accentColor: .blue)
-        XCTAssertEqual(String(attributed.characters), "**没闭合的加粗")
+        XCTAssertEqual(String(attributed.characters), "没闭合的加粗")
     }
 
     func testInlineStrikethroughGetsLineStyle() {

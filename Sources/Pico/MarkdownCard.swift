@@ -155,11 +155,23 @@ enum MarkdownCard {
     /// 行内样式转 AttributedString：加粗/斜体/行内代码/删除线/链接。
     /// 链接只保留样式（accent+下划线）并剥掉可点击属性——卡片是拿来
     /// 读的，不误触打开陌生网页。解析不抛错，失败回退原字符串。
+    /// 破损标记兜底：LLM 译文常把配对的 ** 挪错位置，解析后正文仍残留
+    /// 字面 ** 时，剥掉全部 ** 重解析（丢一处装饰换干净版面）。
     static func inline(
         _ text: String, fontSize: CGFloat, accentColor: Color, weight: Font.Weight = .medium
     ) -> AttributedString {
         let base = Font.system(size: fontSize, weight: weight)
-        var attributed: AttributedString
+        let attributed = convertedInline(text, base: base, accent: accentColor)
+        guard String(attributed.characters).contains("**") else { return attributed }
+        // 首轮解析仍残留字面 **（标记被引擎挪错位、配对破损）——剥掉全部
+        // ** 后重解析，丢一处装饰换干净版面
+        let cleaned = String(attributed.characters).replacingOccurrences(of: "**", with: "")
+        return convertedInline(cleaned, base: base, accent: accentColor)
+    }
+
+    private static func convertedInline(
+        _ text: String, base: Font, accent: Color
+    ) -> AttributedString {
         if var parsed = try? AttributedString(
             markdown: text,
             options: AttributedString.MarkdownParsingOptions(
@@ -183,15 +195,14 @@ enum MarkdownCard {
                     // 链接只留样式：剥掉可点击属性，避免误触打开陌生网页
                     parsed[info.range].link = nil
                     parsed[info.range].swiftUI.underlineStyle = .single
-                    parsed[info.range].swiftUI.foregroundColor = accentColor
+                    parsed[info.range].swiftUI.foregroundColor = accent
                 }
             }
-            attributed = parsed
-        } else {
-            attributed = AttributedString(text)
-            attributed.swiftUI.font = base
+            return parsed
         }
-        return attributed
+        var plain = AttributedString(text)
+        plain.swiftUI.font = base
+        return plain
     }
 
     // MARK: - 行模式匹配
