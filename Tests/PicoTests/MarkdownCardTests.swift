@@ -108,6 +108,17 @@ final class MarkdownCardTests: XCTestCase {
         XCTAssertEqual(String(attributed.characters), "没闭合的加粗")
     }
 
+    func testBrokenPairsRenderAlternatingBold() {
+        // 破损配对兜底：按 ** 切分，奇数段（两个标记之间的内容）渲染为粗体
+        let attributed = MarkdownCard.inline(
+            "前文 **加粗内容** 后文 **另一段** 收尾", fontSize: 13, accentColor: .blue)
+        let plain = String(attributed.characters)
+        XCTAssertFalse(plain.contains("**"), "符号必须被消费")
+        XCTAssertTrue(plain.contains("加粗内容"))
+        XCTAssertTrue(plain.contains("另一段"))
+        XCTAssertTrue(plain.contains("收尾"))
+    }
+
     func testInlineStrikethroughGetsLineStyle() {
         let attributed = MarkdownCard.inline("~~划掉~~", fontSize: 13, accentColor: .blue)
         var hasStyle = false
