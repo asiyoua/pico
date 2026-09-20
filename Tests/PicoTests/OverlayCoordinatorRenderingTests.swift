@@ -76,6 +76,35 @@ final class OverlayCoordinatorRenderingTests: XCTestCase {
         XCTAssertTrue(coordinator.shownEntryIDs.isEmpty, "leaving the card should resume auto-hide")
     }
 
+    /// 鼠标悬停必须「经视图接线」才到得了协调器（tracking area → catcher →
+    /// 视图 onHoverChange → setHovering）。直接调 setHovering 的测试测不到
+    /// 断线：2026-09-20 拖拽层重构丢失转发后单测全绿、真机卡片照样消失，
+    /// 本用例从 catcher 回调入口驱动，把接线本身钉进测试。
+    func testCatcherHoverForwardingPausesAutoHide() async throws {
+        coordinator.cursorOverCard = { _ in false }
+        coordinator.hideAfter = 0.4
+        coordinator.show(Self.longChineseText(), key: "wire-key", on: NSScreen.main)
+        let catcher = try XCTUnwrap(findCatcher(), "卡片内容里必须找得到 WindowDragCatcherView")
+
+        catcher.onHoverChange(true)
+        try await Task.sleep(for: .milliseconds(900))
+        XCTAssertEqual(coordinator.shownEntryIDs.count, 1, "catcher 悬停事件必须经视图转发暂停自动隐藏")
+
+        catcher.onHoverChange(false)
+        try await Task.sleep(for: .milliseconds(1000))
+        XCTAssertTrue(coordinator.shownEntryIDs.isEmpty, "catcher 移开事件必须经视图转发恢复自动隐藏")
+    }
+
+    private func findCatcher() -> WindowDragCatcherView? {
+        var queue: [NSView] = coordinator.panelContentViews
+        while !queue.isEmpty {
+            let view = queue.removeFirst()
+            if let catcher = view as? WindowDragCatcherView { return catcher }
+            queue.append(contentsOf: view.subviews)
+        }
+        return nil
+    }
+
     func testAutoHideStillFiresWithoutHover() async throws {
         // 不依赖真实光标位置
         coordinator.cursorOverCard = { _ in false }

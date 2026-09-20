@@ -306,7 +306,13 @@ struct TranslationOverlayView: View {
         .padding(.bottom, 13)
         .frame(minWidth: 340, maxWidth: 600)
         .overlay { WindowDragCatcherRepresentable(
-            onHoverChange: { cardHovered = $0 },
+            // 悬停事件两个去向缺一不可：cardHovered 只管钉住键浮现，
+            // 暂停/恢复自动隐藏必须同步上报协调器（onHoverChange→setHovering）。
+            // 拖拽层重构曾丢掉后一条转发，单测全绿而真机卡片照样消失。
+            onHoverChange: { hovering in
+                cardHovered = hovering
+                onHoverChange(hovering)
+            },
             excludesHandle: textHeightLimit != nil,
             pinChipVisible: cardHovered || contentPinned) }
         .overlay(alignment: .bottom) {
@@ -444,6 +450,10 @@ final class OverlayPanel: NSPanel {
     var visiblePanelFrames: [NSRect] { entries.map { $0.panel.frame } }
     /// Debug/diagnostic hook: ids of the entries currently on screen.
     var shownEntryIDs: [UUID] { entries.map(\.id) }
+    /// Debug/test hook: content views of the panels currently on screen, so
+    /// tests can reach the drag catcher and drive its hover callbacks the way
+    /// tracking-area delivery does.
+    var panelContentViews: [NSView] { entries.compactMap { $0.panel.contentView } }
 
     private var entries: [Entry] = []
     /// Top-left corner the next fresh overlay should use. Set when the user
