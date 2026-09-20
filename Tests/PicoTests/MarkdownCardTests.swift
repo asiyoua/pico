@@ -50,7 +50,46 @@ final class MarkdownCardTests: XCTestCase {
     func testOrderedItems() {
         let document = MarkdownCard.parse("1. 第一\n2. 第二")
         XCTAssertTrue(document.isMarkdown)
-        XCTAssertEqual(document.blocks, [.ordered(items: ["第一", "第二"])])
+        XCTAssertEqual(
+            document.blocks,
+            [.ordered(items: [
+                MarkdownCard.OrderedItem(number: 1, text: "第一"),
+                MarkdownCard.OrderedItem(number: 2, text: "第二"),
+            ])])
+    }
+
+    /// 引擎译文在有序列表项之间输出空行（段落分隔），列表不得被拆散——
+    /// 否则每个单条块都从 1 数起，2/3/4 条目全显示成 1（2026-09-20 用户报）。
+    func testOrderedListContinuesAcrossBlankLines() {
+        let document = MarkdownCard.parse("1. 甲\n\n2. 乙\n\n3. 丙")
+        XCTAssertTrue(document.isMarkdown)
+        XCTAssertEqual(
+            document.blocks,
+            [.ordered(items: [
+                MarkdownCard.OrderedItem(number: 1, text: "甲"),
+                MarkdownCard.OrderedItem(number: 2, text: "乙"),
+                MarkdownCard.OrderedItem(number: 3, text: "丙"),
+            ])])
+    }
+
+    /// 渲染用源文本的真实序号，不按下标重编。
+    func testOrderedNumbersPreservedFromSource() {
+        let document = MarkdownCard.parse("3. 甲\n\n5. 乙")
+        XCTAssertEqual(
+            document.blocks,
+            [.ordered(items: [
+                MarkdownCard.OrderedItem(number: 3, text: "甲"),
+                MarkdownCard.OrderedItem(number: 5, text: "乙"),
+            ])])
+    }
+
+    /// 空行后接普通段落：段落分段语义保持不变，列表终止。
+    func testBlankLineStillSplitsParagraphsAndEndsList() {
+        let document = MarkdownCard.parse("1. 甲\n\n收尾段落")
+        XCTAssertTrue(document.isMarkdown)
+        XCTAssertEqual(
+            document.blocks,
+            [.ordered(items: [MarkdownCard.OrderedItem(number: 1, text: "甲")]), .paragraph("收尾段落")])
     }
 
     func testFencedCodeKeepsLinesVerbatimAndStripsLanguage() {

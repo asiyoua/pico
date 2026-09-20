@@ -10,11 +10,18 @@ enum MarkdownCard {
         let text: String
     }
 
+    struct OrderedItem: Equatable {
+        let number: Int
+        let text: String
+    }
+
     enum Block: Equatable {
         case heading(level: Int, text: String)
         case paragraph(String)
         case bullet(items: [ListItem])
-        case ordered(items: [String])
+        /// 有序列表保留源文本里的真实序号——引擎/原文写几就是几，
+        /// 不按渲染下标重编（否则 2/3/4 条目会被重置成 1）。
+        case ordered(items: [OrderedItem])
         case code(String)
         case quote(String)
         case divider
@@ -35,9 +42,13 @@ enum MarkdownCard {
         var blocks: [Block] = []
         var paragraph: [String] = []
         var bullets: [(Int, String)] = []
-        var ordered: [String] = []
+        var ordered: [OrderedItem] = []
         var quote: [String] = []
         var code: [String]?
+        /// 空行延迟处理：列表项之间的空行（引擎输出段落分隔）不断开列表，
+        /// 只有空行后接了别的块才真正分段——否则 1/2/3/4 会被拆成四个
+        /// 单条列表、每个都从 1 数起（2026-09-20 用户报「全是一」）。
+        var pendingBlank = false
 
         func flushParagraph() {
             guard !paragraph.isEmpty else { return }
@@ -71,6 +82,7 @@ enum MarkdownCard {
             flushBullets()
             flushOrdered()
             flushQuote()
+            pendingBlank = false
         }
 
         for line in text.components(separatedBy: .newlines) {
@@ -91,7 +103,7 @@ enum MarkdownCard {
                 continue
             }
             if line.isEmpty || line.trimmingCharacters(in: .whitespaces).isEmpty {
-                flushAll()
+                pendingBlank = true
                 continue
             }
             if let match = headingMatch(line) {
@@ -107,18 +119,22 @@ enum MarkdownCard {
                 continue
             }
             if let match = bulletMatch(line) {
+                if pendingBlank && bullets.isEmpty { flushAll() }
                 flushParagraph()
                 flushOrdered()
                 flushQuote()
                 isMarkdown = true
+                pendingBlank = false
                 bullets.append((match.indent, match.content))
                 continue
             }
             if let match = orderedMatch(line) {
+                if pendingBlank && ordered.isEmpty { flushAll() }
                 flushParagraph()
                 flushBullets()
                 flushQuote()
                 isMarkdown = true
+                pendingBlank = false
                 ordered.append(match)
                 continue
             }
@@ -133,6 +149,11 @@ enum MarkdownCard {
             flushBullets()
             flushOrdered()
             flushQuote()
+            if pendingBlank {
+                // 空行后的普通段落行：段落照旧分段
+                flushParagraph()
+                pendingBlank = false
+            }
             paragraph.append(line)
         }
         if let code {
@@ -237,13 +258,13 @@ enum MarkdownCard {
         return (indent, after.trimmingCharacters(in: .whitespaces))
     }
 
-    private static func orderedMatch(_ line: String) -> String? {
+    private static func orderedMatch(_ line: String) -> OrderedItem? {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         guard let spaceIndex = trimmed.firstIndex(of: " ") else { return nil }
         let marker = trimmed[trimmed.startIndex..<spaceIndex]
         guard marker.count <= 9, marker.hasSuffix("."),
-              let _ = Int(marker.dropLast()) else { return nil }
-        return String(trimmed[trimmed.index(after: spaceIndex)...]).trimmingCharacters(in: .whitespaces)
+              let number = Int(marker.dropLast()) else { return nil }
+        return OrderedItem(number: number, text: String(trimmed[trimmed.index(after: spaceIndex)...]).trimmingCharacters(in: .whitespaces))
     }
 
     private static func isDivider(_ line: String) -> Bool {
@@ -299,12 +320,12 @@ struct MarkdownCardBodyView: View {
             }
         case .ordered(let items):
             VStack(alignment: .leading, spacing: fontSize * 0.35) {
-                ForEach(Array(items.enumerated()), id: \.offset) { index, item in
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     HStack(alignment: .top, spacing: fontSize * 0.4) {
-                        Text("\(index + 1).")
+                        Text("\(item.number).")
                             .font(.system(size: fontSize, weight: .medium))
                             .foregroundStyle(.secondary)
-                        Text(MarkdownCard.inline(item, fontSize: fontSize, accentColor: accentColor))
+                        Text(MarkdownCard.inline(item.text, fontSize: fontSize, accentColor: accentColor))
                             .font(.system(size: fontSize, weight: .medium))
                             .fixedSize(horizontal: false, vertical: true)
                     }
