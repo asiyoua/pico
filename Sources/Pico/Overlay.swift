@@ -9,6 +9,11 @@ import SwiftUI
 /// 悬停暂停自动隐藏与钉住按钮的浮现。
 private struct WindowDragCatcherRepresentable: NSViewRepresentable {
     var onHoverChange: (Bool) -> Void
+    /// 仅视觉的初始同步：视图挂窗/重建时光标若已在卡内，直接点亮 cardHovered
+    /// （否则按钮要等一次真实的 mouseEntered 才浮现——卡片弹在光标底下或
+    /// 钉住切换重建视图时，用户手没动就永远看不到钉住键）。不碰协调器：
+    /// 自动隐藏的看门狗不依赖悬停事件。
+    var onInitialHoverSync: ((Bool) -> Void)?
     var excludesHandle: Bool
     /// 钉住按钮当前是否可见（悬停或已钉住）：可见时头部命中区让位三键
     var pinChipVisible: Bool
@@ -16,6 +21,7 @@ private struct WindowDragCatcherRepresentable: NSViewRepresentable {
     func makeNSView(context: Context) -> WindowDragCatcherView {
         let view = WindowDragCatcherView()
         view.onHoverChange = onHoverChange
+        view.onInitialHoverSync = onInitialHoverSync
         view.excludesHandle = excludesHandle
         view.pinChipVisible = pinChipVisible
         return view
@@ -23,6 +29,7 @@ private struct WindowDragCatcherRepresentable: NSViewRepresentable {
 
     func updateNSView(_ nsView: WindowDragCatcherView, context: Context) {
         nsView.onHoverChange = onHoverChange
+        nsView.onInitialHoverSync = onInitialHoverSync
         nsView.excludesHandle = excludesHandle
         nsView.pinChipVisible = pinChipVisible
     }
@@ -30,12 +37,35 @@ private struct WindowDragCatcherRepresentable: NSViewRepresentable {
 
 final class WindowDragCatcherView: NSView {
     var onHoverChange: (Bool) -> Void = { _ in }
+    var onInitialHoverSync: ((Bool) -> Void)?
     var excludesHandle = false
     var pinChipVisible = false
     private var startMouse: CGPoint?
     private var startOrigin: CGPoint?
     private var scrollTarget: NSScrollView?
     private var trackingArea: NSTrackingArea?
+
+    private var didSyncInitialHover = false
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        syncInitialHoverOnce()
+    }
+
+    /// 视图挂窗/重建时光标若已在卡内，直接点亮 cardHovered（否则钉住键要等
+    /// 一次真实的 mouseEntered 才浮现——卡片弹在光标底下、或钉住切换重建
+    /// 视图后用户手没动，就永远看不到钉住键）。仅同步视觉状态，不碰协调器：
+    /// 自动隐藏不依赖悬停事件（压卡有看门狗，离开有 mouseExited/轮询兜底）。
+    /// viewDidMoveToWindow 与 updateTrackingAreas 双钩子：SwiftUI 桥视图的
+    /// 挂窗时机不稳，后者在布局完成后必被调用。
+    private func syncInitialHoverOnce() {
+        guard !didSyncInitialHover, window != nil else { return }
+        didSyncInitialHover = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let window = self.window else { return }
+            self.onInitialHoverSync?(window.frame.contains(NSEvent.mouseLocation))
+        }
+    }
 
     override func mouseDown(with event: NSEvent) {
         startMouse = NSEvent.mouseLocation
@@ -79,6 +109,7 @@ final class WindowDragCatcherView: NSView {
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
+        syncInitialHoverOnce()
         if let trackingArea { removeTrackingArea(trackingArea) }
         let area = NSTrackingArea(
             rect: bounds,
@@ -313,6 +344,7 @@ struct TranslationOverlayView: View {
                 cardHovered = hovering
                 onHoverChange(hovering)
             },
+            onInitialHoverSync: { cardHovered = $0 },
             excludesHandle: textHeightLimit != nil,
             pinChipVisible: cardHovered || contentPinned) }
         .overlay(alignment: .bottom) {
