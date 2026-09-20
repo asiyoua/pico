@@ -529,10 +529,11 @@ final class OverlayPanel: NSPanel {
         }
         // replace 模式只顶掉未钉住的卡：钉住的卡只随显式关闭消失
         if behavior == .replace { hideUnpinned() }
-        if entries.count >= 3 {
-            // 挤掉最老的一张；钉住的卡片豁免——全部钉住时才挤最老的钉住卡
-            let victim = entries.first(where: { !$0.contentPinned }) ?? entries[0]
-            remove(victim.id)
+        // 数量上限只管未钉住的临时卡（防自动监听/堆叠模式下连续复制糊屏）；
+        // 钉住的卡不设上限、永不自动移除——钉住语义=只随显式关闭消失
+        let unpinned = entries.filter { !$0.contentPinned }
+        if unpinned.count >= 3, let oldest = unpinned.first {
+            remove(oldest.id)
         }
         let target = screen ?? NSScreen.main
         let id = UUID()
