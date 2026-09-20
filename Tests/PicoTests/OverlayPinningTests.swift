@@ -29,6 +29,28 @@ final class OverlayPinningTests: XCTestCase {
         XCTAssertTrue(coordinator.shownEntryIDs.isEmpty, "未钉住的卡片按隐藏时长消失")
     }
 
+    /// 取消钉住=恢复普通卡片生命周期。点取消时光标必然压在卡上（点的就是
+    /// 卡上的按钮），而取消钉住会重建视图、旧 tracking 区注销——离开事件
+    /// 可能永远不来。看门狗兜底：光标一离开就转正常倒计时并消失。
+    /// 回归背景：用户 2026-09-20 报「取消钉住后卡片一直挂着不消失」。
+    func testUnpinRestoresAutoHideEvenWhenExitEventNeverArrives() async throws {
+        let coordinator = OverlayCoordinator()
+        coordinator.hideAfter = 0.2
+        coordinator.cursorWatchInterval = 0.05
+        coordinator.cursorOverCard = { _ in true }
+        coordinator.show("一段用来验证取消钉住后生命周期的较长中文文本内容。", key: "unpin-key", on: NSScreen.main)
+        let id = try XCTUnwrap(coordinator.shownEntryIDs.first)
+        coordinator.togglePin(of: id) // 钉住
+        coordinator.togglePin(of: id) // 取消钉住（此刻光标仍压卡）
+
+        try await Task.sleep(for: .milliseconds(300))
+        XCTAssertEqual(coordinator.shownEntryIDs.count, 1, "光标压卡期间不得隐藏（悬停豁免仍在）")
+
+        coordinator.cursorOverCard = { _ in false } // 光标离开（无任何事件）
+        try await Task.sleep(for: .milliseconds(700))
+        XCTAssertTrue(coordinator.shownEntryIDs.isEmpty, "取消钉住后光标一离开必须恢复自动隐藏")
+    }
+
     /// 数量上限只管未钉住的临时卡：堆叠模式第 4 条未钉复制顶掉最老的未钉卡。
     func testUnpinnedCapEvictsOldestUnpinned() {
         let coordinator = OverlayCoordinator()

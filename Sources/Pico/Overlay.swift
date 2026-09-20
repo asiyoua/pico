@@ -464,6 +464,9 @@ final class OverlayPanel: NSPanel {
     private var isApplyingProgrammaticFrame = false
     var hideAfter: Double = 4
     var neverHide = false
+    /// 光标压卡时看门狗的轮询间隔（秒）：压卡期间不倒计时，但 mouseExited
+    /// 在视图重建后可能永远不来（取消钉住会重建视图），靠轮询发现离开。
+    var cursorWatchInterval: Double = 1
     var textSize: OverlayTextSize = .medium {
         didSet {
             // Re-measure: font size changes both the rendered cards and the
@@ -734,14 +737,25 @@ final class OverlayPanel: NSPanel {
     private func scheduleHide(for entry: Entry) {
         // 钉住的卡片不参与自动隐藏，关闭时才消失
         guard !entry.contentPinned else { return }
-        // 光标正压在卡片上时不启动隐藏计时——卡片弹出时光标可能本来就在
-        // 卡片位置，此时没有 mouseEntered 边界事件，悬停暂停只能靠这里兜住
-        if cursorOverCard(entry.panel.frame) {
-            DiagnosticLog.write("auto-hide skipped: cursor over card")
-            return
-        }
         entry.hideTask?.cancel()
         guard !neverHide else { return }
+        // 光标正压在卡片上时不倒计时（悬停豁免：卡片可能就弹在光标位置，
+        // 此时没有 mouseEntered 事件）。但不能干等 mouseExited——取消钉住
+        // 会重建视图、旧 tracking 区注销，离开事件可能永远不来（2026-09-20
+        // 用户报「取消钉住后一直挂着」）。起看门狗轮询，光标一离开转正常
+        // 倒计时；事件链路正常时 setHovering(false) 会先到并重置本任务。
+        if cursorOverCard(entry.panel.frame) {
+            DiagnosticLog.write("auto-hide deferred: cursor over card, watchdog watching")
+            entry.hideTask = Task { [weak self, weak entry] in
+                while let self, let entry, !Task.isCancelled,
+                      self.cursorOverCard(entry.panel.frame) {
+                    try? await Task.sleep(for: .seconds(self.cursorWatchInterval))
+                }
+                guard let entry, !Task.isCancelled else { return }
+                self?.scheduleHide(for: entry)
+            }
+            return
+        }
         let seconds = hideAfter
         entry.hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(seconds))
