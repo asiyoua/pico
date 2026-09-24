@@ -596,6 +596,11 @@ final class OverlayPanel: NSPanel {
         entries.append(entry)
         installContent(for: entry)
         relayout()
+        // Markdown 渲染/文本排版可能需要额外一轮布局才能稳定：
+        // 延迟到下一帧二次校准高度，消除弹出后的位置漂移
+        DispatchQueue.main.async { [weak self] in
+            self?.relayout()
+        }
         isApplyingProgrammaticFrame = true
         panel.orderFrontRegardless()
         isApplyingProgrammaticFrame = false
